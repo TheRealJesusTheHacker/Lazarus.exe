@@ -74,7 +74,11 @@ class ReadOnlySource:
     @property
     def opened_read_only(self) -> bool:
         """True — the only way this class ever opens anything."""
-        return (self.open_flags & os.O_ACCMODE) == os.O_RDONLY
+        # O_ACCMODE is the mask that picks the access mode out of
+        # the open flags. Windows' os module does not name it, but
+        # the access mode lives in the same low bits there, so the
+        # mask's value stands in where the name is absent.
+        return (self.open_flags & getattr(os, "O_ACCMODE", 0o3)) == os.O_RDONLY
 
     def read_at(self, offset: int, length: int) -> bytes:
         if offset < 0 or length < 0:
