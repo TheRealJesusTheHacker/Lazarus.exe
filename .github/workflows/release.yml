@@ -1,0 +1,62 @@
+name: release
+
+# Builds and publishes a Lazarus release when a version tag is
+# pushed (v1.0.0, v1.0.1, ...). One Windows job, in an order that
+# keeps the release honest:
+#   * the FULL test suite runs first, offscreen — if it fails,
+#     nothing builds and nothing uploads;
+#   * the release is then built by the same script used locally
+#     (tools/build_release.py), so CI ships what local builds prove;
+#   * the built exe must pass its --self-check (exit code 0)
+#     before anything is attached to the release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out the tagged code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install what the build needs
+        run: pip install PySide6 PyInstaller pytest
+
+      - name: Run the full test suite (interface offscreen)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
+
+      - name: Build the release (exe, portable zip, checksums)
+        run: python tools/build_release.py
+
+      # The exe is windowed, so it is started with Start-Process
+      # -Wait: a plain "&" launch returns before the program has
+      # finished, and its exit code would never be seen.
+      - name: Smoke-test the built exe (--self-check must exit 0)
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath "dist\Lazarus.exe" -ArgumentList "--self-check" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Write-Host "Lazarus.exe --self-check failed with exit code $($proc.ExitCode)."
+            exit 1
+          }
+          Write-Host "Lazarus.exe --self-check passed."
+
+      - name: Attach the release files to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Lazarus.exe
+            dist/LazarusPortable.zip
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
