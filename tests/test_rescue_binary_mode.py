@@ -37,8 +37,19 @@ BLOCK = 4096
 _FAKE_O_BINARY = 1 << 30
 
 _real_open = os.open
-_real_pwrite = os.pwrite
+_real_pwrite = getattr(os, "pwrite", None)
 _real_close = os.close
+
+# The model drives the pretend Windows runtime through os.pwrite,
+# which exists only on POSIX systems. On Windows itself there is
+# nothing to model with — the real runtime is already there, and
+# the rescue suite exercises it end to end — so this module stands
+# down there instead of failing to import.
+pytestmark = pytest.mark.skipif(
+    _real_pwrite is None,
+    reason="models the Windows runtime through os.pwrite, which "
+    "only POSIX systems provide",
+)
 
 
 class WindowsTextMode:
