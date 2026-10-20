@@ -32,8 +32,13 @@ jobs:
         run: pip install PySide6 PyInstaller pytest
 
       - name: Run the full test suite (interface offscreen)
+        timeout-minutes: 45
         env:
           QT_QPA_PLATFORM: offscreen
+          # Unbuffered, so the run log shows progress test by
+          # test instead of one block at the end — a stall names
+          # the test it stopped on.
+          PYTHONUNBUFFERED: "1"
         run: python -m pytest -q
 
       - name: Build the release (exe, portable zip, checksums)

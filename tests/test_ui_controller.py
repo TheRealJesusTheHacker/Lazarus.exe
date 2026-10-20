@@ -9,6 +9,7 @@ the engine's own.
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -353,6 +354,11 @@ def test_unlock_wrong_key_is_not_accepted(controller):
     assert result["next_step"]
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="pins the non-Windows seam answer; on Windows the seam "
+    "is live Windows tooling",
+)
 def test_volumes_on_a_non_windows_computer_say_so_plainly(controller):
     # This machine is not Windows, so the real seam is unavailable.
     result = controller.list_volumes()
@@ -689,10 +695,21 @@ def test_prune_apply_without_any_plan_refuses_plainly(controller, tmp_path):
 
 # -- pipes and sockets never reach the engine (F-05) ----------------------------
 
+def _mkfifo(path):
+    """Make a pipe, or stand the test down where pipes cannot be made.
+
+    os.mkfifo is POSIX-only; on Windows there is no pipe file to
+    refuse, so these pins stand down there instead of erroring.
+    """
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("this computer cannot make a pipe (no os.mkfifo)")
+    os.mkfifo(path)
+
+
 
 def test_fifo_sources_are_refused_plainly(controller, tmp_path):
     fifo = tmp_path / "the-pipe"
-    os.mkfifo(fifo)
+    _mkfifo(fifo)
     for call in (
         lambda: controller.scan_deleted(fifo),
         lambda: controller.rescue(fifo, tmp_path / "img.bin"),
@@ -712,7 +729,7 @@ def test_fifo_rescue_destination_is_refused_plainly(controller, tmp_path):
     source = tmp_path / "drive.bin"
     source.write_bytes(b"\x01" * 8192)
     fifo = tmp_path / "dest-pipe"
-    os.mkfifo(fifo)
+    _mkfifo(fifo)
     with pytest.raises(LazarusError) as caught:
         controller.rescue(source, fifo)
     assert "is a pipe" in str(caught.value)
@@ -752,7 +769,7 @@ def test_normal_file_still_scans_with_the_fifo_guard_in_place(controller, fat_dr
 
 def test_symlink_to_fifo_sources_are_refused_plainly(controller, tmp_path):
     fifo = tmp_path / "the-pipe"
-    os.mkfifo(fifo)
+    _mkfifo(fifo)
     link = tmp_path / "the-shortcut"
     link.symlink_to(fifo)
     for call in (
@@ -770,7 +787,7 @@ def test_symlink_to_fifo_rescue_destination_is_refused_plainly(controller, tmp_p
     source = tmp_path / "drive.bin"
     source.write_bytes(b"\x01" * 8192)
     fifo = tmp_path / "dest-pipe"
-    os.mkfifo(fifo)
+    _mkfifo(fifo)
     link = tmp_path / "dest-shortcut"
     link.symlink_to(fifo)
     with pytest.raises(LazarusError) as caught:
@@ -820,7 +837,7 @@ def test_snapshot_of_a_symlink_to_a_fifo_is_still_stored_as_a_link(
     controller, tmp_path
 ):
     fifo = tmp_path / "the-pipe"
-    os.mkfifo(fifo)
+    _mkfifo(fifo)
     link = tmp_path / "the-shortcut"
     link.symlink_to(fifo)
     controller.create_store(tmp_path / "store")

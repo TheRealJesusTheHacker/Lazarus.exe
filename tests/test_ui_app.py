@@ -8,6 +8,7 @@ it) — fast and deterministic, no dialogs left open.
 
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
 
@@ -41,9 +42,29 @@ def qapp():
     yield app
 
 
+def _fixture_platform():
+    """The platform a fixture window talks to.
+
+    Off Windows this is the computer's own seam (None), whose
+    honest "not running Windows" answer the locked-page test
+    pins. On Windows the computer's own seam shells out to
+    PowerShell and manage-bde with no timeout, and a window
+    fixture must never wait on real Windows tooling — or leave
+    it running when the fixture tears the window down — so the
+    window gets an empty fake there instead. The unlock flows
+    keep their own fake-platform tests on every system.
+    """
+    if sys.platform == "win32":
+        return _FakePlatform([])
+    return None
+
+
 @pytest.fixture()
 def window(qapp, tmp_path):
-    controller = Controller(config_path=tmp_path / "cfg" / "backup.json")
+    controller = Controller(
+        config_path=tmp_path / "cfg" / "backup.json",
+        platform=_fixture_platform(),
+    )
     win = MainWindow(controller)
     win.show()
     qapp.processEvents()
@@ -112,6 +133,11 @@ def test_key_dialog_is_password_echo_and_clears_after_reading(qapp):
     assert dialog.key_edit.text() == ""
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="pins the off-Windows explanation; window fixtures use "
+    "a fake platform on Windows",
+)
 def test_locked_page_shows_the_engines_plain_explanation_off_windows(window):
     # This machine is not Windows: the volumes area must carry the
     # engine's explanation, not an empty void.
