@@ -367,8 +367,19 @@ def _write_all_at(fd: int, data: bytes, offset: int) -> None:
     """Write all of ``data`` to the image at ``offset``."""
     view = memoryview(data)
     written = 0
+    # Write at a position: os.pwrite where it exists. Windows has
+    # no os.pwrite, so there the file pointer is moved to the
+    # offset once and the writes walk forward from it — the same
+    # bytes land in the same places. (Looked up per call, so the
+    # Windows text-mode model in the tests can stand in for it.)
+    pwrite = getattr(os, "pwrite", None)
+    if pwrite is None:
+        os.lseek(fd, offset, os.SEEK_SET)
     while written < len(view):
-        count = os.pwrite(fd, view[written:], offset + written)
+        if pwrite is not None:
+            count = pwrite(fd, view[written:], offset + written)
+        else:
+            count = os.write(fd, view[written:])
         if count <= 0:
             raise OSError("writing to the image stopped partway through")
         written += count

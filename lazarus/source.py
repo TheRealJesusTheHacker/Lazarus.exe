@@ -83,7 +83,17 @@ class ReadOnlySource:
             return b""
         length = min(length, self.size - offset)
         try:
-            return os.pread(self._fd, length, offset)
+            # Read at a position without depending on where the
+            # file pointer sits. os.pread does exactly that where
+            # it exists; Windows has no os.pread, so there the
+            # pointer is moved first and the read follows it. This
+            # source is only ever read from one thread at a time,
+            # so the pointer cannot be moved under the read.
+            pread = getattr(os, "pread", None)
+            if pread is not None:
+                return pread(self._fd, length, offset)
+            os.lseek(self._fd, offset, os.SEEK_SET)
+            return os.read(self._fd, length)
         except OSError as error:
             raise SourceError(
                 f"Reading {self.path} failed at byte {offset:,}: "
