@@ -2,6 +2,19 @@
 
 All notable changes to LAZARUS.EXE are recorded here, newest first.
 
+## [Unreleased]
+
+### Fixed
+
+- **Rescue image writes are byte-exact on Windows** — the rescue
+  image file is now opened in binary mode (`O_BINARY`) at both the
+  fresh-image and resume opens. Without it, Windows text mode
+  translated every 0x0A byte in rescued data to 0x0D 0x0A as it was
+  written, corrupting the image. Found by the fleet-wide Windows
+  text-mode audit (2026-10-20); regression tests model the Windows
+  runtime and drive a real rescue end to end
+  (`tests/test_rescue_binary_mode.py`).
+
 ## [0.5.0] — 2026-10-20
 
 Phase 4 — backup automation: the versioned store, made automatic.
