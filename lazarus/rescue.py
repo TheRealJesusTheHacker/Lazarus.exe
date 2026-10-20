@@ -583,7 +583,11 @@ def rescue_to_image(
             region_map = _fresh_map(total, block_size)
             try:
                 image_fd = os.open(
-                    destination_path, os.O_RDWR | os.O_CREAT | os.O_TRUNC
+                    destination_path,
+                    os.O_RDWR
+                    | os.O_CREAT
+                    | os.O_TRUNC
+                    | getattr(os, "O_BINARY", 0),
                 )
                 os.ftruncate(image_fd, total)
             except OSError as error:
@@ -596,7 +600,9 @@ def rescue_to_image(
             region_map.save(map_file)
         else:
             try:
-                image_fd = os.open(destination_path, os.O_RDWR)
+                image_fd = os.open(
+                    destination_path, os.O_RDWR | getattr(os, "O_BINARY", 0)
+                )
             except OSError as error:
                 raise RescueError(
                     "Lazarus could not open the image at "
