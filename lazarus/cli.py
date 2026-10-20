@@ -9,6 +9,13 @@
     lazarus scan    <drive-or-image>
     lazarus recover <drive-or-image> --to FOLDER [--name FILE ...]
     lazarus rescue  <drive-or-image> <image-file> [--map FILE]
+    lazarus volumes
+    lazarus unlock  <volume>
+    lazarus decryptors
+    lazarus identify <folder>
+    lazarus decrypt  <folder> --to WORK --decryptor PROGRAM
+                    [--family NAME]
+    lazarus assess   <path>
 
 Exit codes: 0 = done, fully; 1 = done, but something in the report
 needs your attention (a partial restore, a failed check); 2 = Lazarus
@@ -18,16 +25,21 @@ stopped before doing the work, and says why.
 from __future__ import annotations
 
 import argparse
+import getpass
 import sys
 from pathlib import Path
 
 from ._version import __version__
-from .errors import LazarusError
+from .assess import assess_options
+from .decrypt_run import SubprocessRunner, prepare_work_area, run_decryptor
+from .decryptors import find_entry, identify_family, load_registry
+from .errors import DecryptorError, LazarusError
 from .rescue import rescue_to_image
 from .restore import restore
 from .snapshot import create_snapshot
 from .store import SnapshotStore
 from .undelete import recover_deleted, scan_for_deleted
+from .unlock import default_platform, unlock_volume
 from .verify import verify_snapshot, verify_store
 
 
@@ -129,6 +141,163 @@ def _cmd_rescue(args) -> int:
     return 0 if report.status == "complete" else 1
 
 
+def _read_key(prompt: str) -> str:
+    """Read a recovery key without echoing it to the screen."""
+    return getpass.getpass(prompt)
+
+
+def _cmd_volumes(args) -> int:
+    platform = default_platform()
+    rows = platform.list_volumes()
+    if not rows:
+        print("No volumes could be listed.")
+        return 0
+    for volume in rows:
+        if (volume.kind or "").strip().lower() == "bitlocker":
+            if volume.locked is True:
+                state = "locked"
+            elif volume.locked is False:
+                state = "open"
+            else:
+                state = "lock state unknown"
+            print(f"{volume.ref} — BitLocker, {state}")
+        else:
+            print(f"{volume.ref} — {volume.kind}")
+    return 0
+
+
+def _cmd_unlock(args) -> int:
+    outcome = unlock_volume(
+        default_platform(),
+        args.volume,
+        lambda: _read_key("Type the volume's recovery key: "),
+    )
+    print(outcome.to_text())
+    return 0 if outcome.status in ("unlocked", "already-unlocked") else 1
+
+
+def _cmd_decryptors(args) -> int:
+    for entry in load_registry():
+        print(
+            f"{entry.family} — {entry.decryptor_name}, free from "
+            f"{entry.publisher}. Checked {entry.verified_utc}. "
+            f"{entry.source_url}"
+        )
+    return 0
+
+
+def _cmd_identify(args) -> int:
+    if not str(args.folder).strip():
+        raise DecryptorError(
+            "No folder was named, so there is nothing to look at."
+        )
+    folder = Path(args.folder)
+    identification = identify_family(folder, load_registry())
+    if identification.matches:
+        for match in identification.matches:
+            entry = match.entry
+            print(
+                f"{entry.family} — this {match.confidence} the family "
+                "that locked these files."
+            )
+            for piece in match.evidence:
+                print(f"  - {piece}")
+            print(
+                f"  Published decryptor: {entry.decryptor_name} "
+                f"({entry.publisher}). {entry.conditions}"
+            )
+    else:
+        print(
+            f"Lazarus does not recognize the signs in {folder} as any "
+            "family on its list."
+        )
+    for note in identification.notes:
+        print(note)
+    return 0
+
+
+#: The longest a decryptor run may take before Lazarus stops it:
+#: four hours. Real decryptors can work for a long while on a big
+#: folder, so the limit is generous — but it exists, so a program
+#: that hangs cannot hang Lazarus forever.
+_DECRYPT_TIMEOUT_SECONDS = 4 * 60 * 60
+
+
+def _cmd_decrypt(args) -> int:
+    if not str(args.folder).strip():
+        raise DecryptorError(
+            "No folder was named, so there is nothing to work on."
+        )
+    registry = load_registry()
+    if args.family:
+        entry = find_entry(registry, args.family)
+        if entry is None:
+            raise DecryptorError(
+                f"Lazarus has no decryptor listed for '{args.family}'. "
+                "Run lazarus decryptors to see the families it knows, "
+                "and use one of those names."
+            )
+    else:
+        identification = identify_family(Path(args.folder), registry)
+        # Only a "looks like" match — the family's own ransom
+        # note — is enough for Lazarus to choose a decryptor by
+        # itself, and only when exactly one family looks likely:
+        # two plain readings point to one family no more plainly
+        # than a suggestion does. A "may be" is a suggestion, and
+        # Lazarus does not run a stranger's program on a
+        # suggestion: the owner names the family, or nobody runs.
+        looks_like = [
+            match
+            for match in identification.matches
+            if match.confidence == "looks like"
+        ]
+        if len(looks_like) > 1:
+            names = " and ".join(
+                match.entry.family for match in looks_like
+            )
+            raise DecryptorError(
+                f"The signs in this folder point plainly at more "
+                f"than one family — {names} — and Lazarus will "
+                f"not choose between families by itself. Name "
+                f"the one to use with --family."
+            )
+        entry = looks_like[0].entry if looks_like else None
+        if entry is None:
+            if identification.matches:
+                raise DecryptorError(
+                    "The signs in this folder only suggest which "
+                    "family locked these files — they do not point "
+                    "to one plainly, so Lazarus will not choose a "
+                    "decryptor by itself. If you know the family, "
+                    "name it with --family. Run lazarus identify "
+                    "to see what Lazarus found."
+                )
+            raise DecryptorError(
+                "Lazarus could not tell which family locked these "
+                "files, so it will not run a decryptor blind. Run "
+                "lazarus identify first, or pass --family."
+            )
+    work = prepare_work_area(Path(args.folder), Path(args.to))
+    report = run_decryptor(
+        entry,
+        work,
+        Path(args.decryptor),
+        SubprocessRunner(timeout_seconds=_DECRYPT_TIMEOUT_SECONDS),
+    )
+    print(report.to_text())
+    return {"complete": 0, "attention": 1, "failed": 2}[report.status]
+
+
+def _cmd_assess(args) -> int:
+    if not str(args.path).strip():
+        raise DecryptorError(
+            "Nothing was named, so there is nothing to assess."
+        )
+    assessment = assess_options(Path(args.path), platform=default_platform())
+    print(assessment.to_text())
+    return 0
+
+
 def _cmd_restore(args) -> int:
     store = SnapshotStore.open(Path(args.store))
     report = restore(
@@ -196,6 +365,53 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("destination", help="the image file to create (or resume)")
     p.add_argument("--map", default=None, help="progress file (default: beside the image)")
     p.set_defaults(func=_cmd_rescue)
+
+    p = sub.add_parser("volumes", help="list the volumes Lazarus can see")
+    p.set_defaults(func=_cmd_volumes)
+
+    p = sub.add_parser(
+        "unlock", help="open a locked volume with your own recovery key"
+    )
+    p.add_argument("volume")
+    p.set_defaults(func=_cmd_unlock)
+
+    p = sub.add_parser(
+        "decryptors", help="list the published decryptors Lazarus knows"
+    )
+    p.set_defaults(func=_cmd_decryptors)
+
+    p = sub.add_parser(
+        "identify",
+        help="tell which ransomware family locked a folder's files",
+    )
+    p.add_argument("folder")
+    p.set_defaults(func=_cmd_identify)
+
+    p = sub.add_parser(
+        "decrypt",
+        help="run a published decryptor on copies of a folder's files",
+    )
+    p.add_argument("folder")
+    p.add_argument(
+        "--to", required=True,
+        help="new folder Lazarus will prepare as its work area",
+    )
+    p.add_argument(
+        "--decryptor", required=True,
+        help="the decryptor program to run, fetched from its publisher",
+    )
+    p.add_argument(
+        "--family", default=None,
+        help="the family that locked the files, as listed by "
+        "lazarus decryptors (default: tell from the folder's signs)",
+    )
+    p.set_defaults(func=_cmd_decrypt)
+
+    p = sub.add_parser(
+        "assess", help="what Lazarus can do for a drive or folder"
+    )
+    p.add_argument("path")
+    p.set_defaults(func=_cmd_assess)
 
     return parser
 

@@ -2,7 +2,7 @@
 
 **Sentinel Safeguard LLC — backup, restore, and file recovery for Windows.**
 
-[![Version](https://img.shields.io/badge/version-v0.3.0-2ee06f?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
+[![Version](https://img.shields.io/badge/version-v0.4.0-2ee06f?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/TheRealJesusTheHacker/Lazarus.exe)
 [![Python](https://img.shields.io/badge/Python-3-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Proprietary-b03a2e?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/LICENSE)
@@ -97,21 +97,30 @@ language, no corners cut, nothing promised that isn't delivered.
 
 ## Status
 
-**v0.3.0 — Phase 2 complete: undelete and drive rescue.** Lazarus
-can now scan a drive or a drive image for deleted files — FAT12,
-FAT16, FAT32, and NTFS — and weigh every file it finds from the
-filesystem's own evidence: *likely whole*, *partly there* (with
-the damage stated), or *gone*, said plainly. `lazarus recover`
-brings them back onto a different drive than the one being read —
-recovering onto the same drive is refused, because writing there
-could overwrite the very files being looked for. And
-`lazarus rescue` clones a failing drive to an image gently:
-bad stretches are skipped fast and returned to later, every step
-is recorded in a progress file, and a rescue can stop and resume
-without losing its place. Phase 1's snapshot store and restore
-engine (`lazarus init`, `snap`, `list`, `verify`, `restore`)
-stand as shipped. It all runs today from the command line; the
-animated interface arrives in Phase 5 — see the
+**v0.4.0 — Phase 3 complete: decrypt & unlock.** Lazarus can now
+open a BitLocker volume with the owner's own recovery key:
+Windows' own tools do the opening, and Lazarus asks once, with
+the one key it is given — a key is never kept, never shown, and
+never retried. It also keeps a short, hand-checked list of
+published ransomware decryptors — six families at this release:
+STOP/Djvu, GandCrab, Avaddon, REvil/Sodinokibi, Babuk, and
+Maze/Sekhmet/Egregor, each credited to its publisher and dated
+when it was last checked against the publisher's own page — and
+it runs a decryptor only on copies, inside a work area it
+prepared and re-checks before anything runs, with the original
+files hash-checked before and after. `lazarus identify` weighs
+the signs in a folder and answers honestly — *looks like* or
+*may be*, never "confirmed" — and `lazarus assess` lays out,
+for one drive or folder, what can actually be done. Where no
+published decryptor exists, Lazarus says so plainly and points
+at what is possible instead; it never implies it can break
+encryption. Phases 1–2 stand as shipped: the snapshot store
+and restore engine, and undelete with honest odds plus rescue
+cloning for dying drives. The unlock path drives Windows' own
+tools, so its last step of proof waits for a Windows machine —
+the roadmap's Phase 3 note says exactly which parts those are.
+It all runs today from the command line; the animated
+interface arrives in Phase 5 — see the
 [roadmap](docs/ROADMAP.md) and the [changelog](CHANGELOG.md).
 
 A portable no-install edition (folder/USB, Argus Portable pattern) is a named Phase 5 deliverable and will ship alongside the installer — see the roadmap.

@@ -129,7 +129,47 @@ come, and nothing above claims otherwise.
   because it can't, and neither can anyone else honestly selling
   that promise.
 
-**Status: PLANNED.**
+**Status: COMPLETE (v0.4.0, 2026-10-20).**
+
+**As built.** `lazarus volumes` and `lazarus unlock E:` drive
+BitLocker through Windows' own `manage-bde`, behind a platform
+seam. Commands are built with a placeholder where the key
+belongs; the key is substituted only into the executed copy, in
+memory, on Windows. The key is asked for once — typed at a
+prompt that does not echo, never taken as a command argument —
+tried exactly once, and never stored, shown, logged, or
+retried. A volume that cannot be positively identified as
+BitLocker from Windows' own status fields is refused plainly.
+On any other system the same commands refuse plainly rather
+than pretending. What is proven where: command construction,
+status-output reading, key handling, the one-attempt rule, and
+every refusal are proven by the test suite here; **the unlock
+itself — `manage-bde` accepting a key on a real Windows volume —
+is seam-only until a Windows-hardware run**, and after a
+successful unlock the volume is handed to the Phase 1/2 engines
+like any other drive. The decryptor list
+(`lazarus/decryptors_registry.json`) ships six entries, each
+verified against its publisher's own page on 2026-10-20:
+STOP/Djvu (Emsisoft), GandCrab (Bitdefender), Avaddon
+(Emsisoft), REvil/Sodinokibi (Bitdefender; attacks before
+2021-07-13 only), Babuk (Avast), Maze/Sekhmet/Egregor
+(Emsisoft). The runner (`lazarus decrypt`) runs a registered
+decryptor only on copies inside a Lazarus work area that it
+re-verifies at run time — folder layout, symbolic and hard
+links, the fingerprint record, every copy's hash, an empty
+recovered-files folder — with the originals hashed before and
+after, and the report separating changes that predate the run
+from changes during it. `lazarus identify` answers *looks
+like* / *may be* and never "confirmed", and the decrypt
+command acts on its own reading only for a single *looks
+like*. `lazarus assess` gives the one-screen honest answer.
+Proven by a 290-test suite (1 skipped) and three independent
+audit rounds (18 findings, then 11, then 4 of low severity —
+all fixed and re-probed). One limit is recorded rather than
+hidden: the work area is verified immediately before the run,
+and no check can freeze a disk — a change made in the moment
+between verification and running is caught by the report's
+before/after check on the originals, not prevented.
 
 ## Phase 4 — Backup automation
 

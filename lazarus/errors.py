@@ -57,3 +57,23 @@ class RescueError(LazarusError):
 
 class NothingToRestoreError(LazarusError):
     """The chosen snapshot holds nothing matching what was asked for."""
+
+
+class UnlockError(LazarusError):
+    """A locked volume could not be opened or even asked about."""
+
+
+class UnlockRefusedError(LazarusError):
+    """A safety rule stopped an unlock before anything was tried."""
+
+
+class RegistryError(LazarusError):
+    """The decryptor list is missing, unreadable, or not trustworthy."""
+
+
+class DecryptorError(LazarusError):
+    """A published decryptor could not be run or did not finish."""
+
+
+class DecryptorRefusedError(LazarusError):
+    """A safety rule stopped a decryptor run before anything ran."""

@@ -2,6 +2,75 @@
 
 All notable changes to LAZARUS.EXE are recorded here, newest first.
 
+## [0.4.0] — 2026-10-20
+
+Phase 3 — decrypt & unlock files off drives.
+
+### Added
+
+- **Owner-key BitLocker unlock** — `lazarus volumes` lists the
+  BitLocker volumes Windows reports, and `lazarus unlock E:`
+  opens one with the owner's own recovery key, through Windows'
+  own `manage-bde`. The cryptography is Windows' job; Lazarus
+  orchestrates. The key is typed at a prompt that does not echo
+  (never taken as a command argument), tried exactly once, and
+  never stored, printed, or retried — Lazarus does not
+  brute-force, does not cycle through keys, and says so. A
+  volume Lazarus cannot positively identify as BitLocker is
+  refused plainly, never guessed at. On a computer that is not
+  running Windows the commands refuse plainly too: the
+  orchestration is built and tested, and the unlock itself
+  runs only where Windows' tools exist.
+- **A maintained list of published ransomware decryptors** —
+  six families, every entry verified against its publisher's
+  own page on 2026-10-20 and carrying the publisher, the
+  source address, the publisher's credit line, and its honest
+  limits: STOP/Djvu (Emsisoft; offline keys and pre-August-2019
+  file pairs only), GandCrab (Bitdefender; versions 1, 4, and
+  5–5.2), Avaddon (Emsisoft), REvil/Sodinokibi (Bitdefender;
+  attacks before 13 July 2021 only), Babuk (Avast), and
+  Maze/Sekhmet/Egregor (Emsisoft). The list is data, checked
+  strictly when read — a damaged or tampered list is refused
+  whole, never partly trusted. `lazarus decryptors` shows it.
+- **A decryptor runner that only ever touches copies** —
+  `lazarus decrypt` prepares a work area (copies plus a
+  fingerprint record), re-verifies that work area at run time —
+  the folders themselves, symbolic and hard links, the record,
+  every copy's hash, an empty output folder — and only then
+  runs the decryptor, on the copies, with the originals hashed
+  before and after. The report states plainly what was
+  produced, whether the originals changed (and whether any
+  change predates the run), and the fingerprint of the exact
+  program that ran. Anything that does not check out is a
+  refusal before the program starts, never a quiet workaround.
+- **Family identification with honest confidence** —
+  `lazarus identify` weighs ransom-note names and file
+  extensions against the list and answers *looks like* (the
+  family's own note is present) or *may be* (weaker signs),
+  with the evidence listed. It never says "confirmed". The
+  decrypt command chooses a decryptor by itself only on a
+  single *looks like*; anything less, or two families at once,
+  stops and asks the owner to name the family.
+- **One honest assessment** — `lazarus assess` answers "what
+  are my options for this drive or folder" on one screen: an
+  identified family and whether a decryptor exists, an
+  encrypted volume and the owner-key path, or a plain statement
+  that neither applies, with the standing alternatives (restore
+  from a snapshot, undelete, salvage) named either way.
+
+### Notes
+
+- The suite stands at 290 tests passing (1 skipped). Phase 3
+  went through three independent audit rounds — 18 findings,
+  then 11, then 4 of low severity — every one fixed and
+  re-probed, including forged work areas, link swaps, tampered
+  records, poisoned registry data, and crafted tool output.
+- The BitLocker unlock itself — Windows accepting the key on a
+  real volume — is the one part that cannot be proven on this
+  machine; it is listed in the roadmap's Phase 3 as-built note
+  as seam-only until a Windows-hardware run, not claimed as
+  proven.
+
 ## [0.3.0] — 2026-10-20
 
 Phase 2 — undelete and drive rescue.

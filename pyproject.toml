@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lazarus"
-version = "0.3.0"
+version = "0.4.0"
 description = "LAZARUS.EXE — Sentinel Safeguard LLC backup, restore, and file recovery for Windows."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,6 +16,9 @@ lazarus = "lazarus.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["lazarus*"]
+
+[tool.setuptools.package-data]
+lazarus = ["*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
