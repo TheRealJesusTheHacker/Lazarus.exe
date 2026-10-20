@@ -93,6 +93,12 @@ The key phase. Lazarus's reason to exist.
   first-class screens, not fine print.
 - Packaging: the single self-installing exe pattern the medic kit
   standardised on (one file, one admin prompt, verified install).
+- **Portable edition (named deliverable):** a portable no-install
+  edition of Lazarus — runs from a folder or USB drive with no
+  installation, following the Argus Portable pattern
+  (ArgusPortable.zip) — ships alongside the installer at Phase 5.
+  It is a committed Phase 5 deliverable, not a backlog option, and
+  is part of the Technician's Toolkit USB set.
 - Every failure state a designed screen with one clear next action,
   in plain language.
 
@@ -100,8 +106,10 @@ The key phase. Lazarus's reason to exist.
 
 ## Later / backlog
 
-- **Portable edition** for the future IT Toolkit USB (alongside
-  Argus Portable and Charon Portable), for technician field work.
+- Technician's Toolkit USB bundling — the Phase 5 portable edition
+  (see above) packaged into the Technician's Toolkit USB set,
+  alongside Argus Portable and Charon Portable, for technician
+  field work.
 - Whole-disk/partition restore (bare-metal recovery) — after the
   file-level engine has proven itself on hardware.
 - Additional published-decryptor coverage as researchers release
