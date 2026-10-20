@@ -6,6 +6,9 @@
     lazarus verify  <store> [snapshot-id]
     lazarus restore <store> [--to FOLDER] [--snapshot ID | --as-of DATE]
                     [--path FILE-OR-FOLDER]
+    lazarus scan    <drive-or-image>
+    lazarus recover <drive-or-image> --to FOLDER [--name FILE ...]
+    lazarus rescue  <drive-or-image> <image-file> [--map FILE]
 
 Exit codes: 0 = done, fully; 1 = done, but something in the report
 needs your attention (a partial restore, a failed check); 2 = Lazarus
@@ -20,9 +23,11 @@ from pathlib import Path
 
 from ._version import __version__
 from .errors import LazarusError
+from .rescue import rescue_to_image
 from .restore import restore
 from .snapshot import create_snapshot
 from .store import SnapshotStore
+from .undelete import recover_deleted, scan_for_deleted
 from .verify import verify_snapshot, verify_store
 
 
@@ -102,6 +107,28 @@ def _cmd_verify(args) -> int:
     return 1
 
 
+def _cmd_scan(args) -> int:
+    report = scan_for_deleted(Path(args.source))
+    print(report.to_text())
+    return 0
+
+
+def _cmd_recover(args) -> int:
+    report = recover_deleted(Path(args.source), Path(args.to), names=args.name)
+    print(report.to_text())
+    return {"complete": 0, "partial": 1, "failed": 2}[report.status]
+
+
+def _cmd_rescue(args) -> int:
+    report = rescue_to_image(
+        Path(args.source),
+        Path(args.destination),
+        map_path=Path(args.map) if args.map else None,
+    )
+    print(report.to_text())
+    return 0 if report.status == "complete" else 1
+
+
 def _cmd_restore(args) -> int:
     store = SnapshotStore.open(Path(args.store))
     report = restore(
@@ -150,6 +177,25 @@ def build_parser() -> argparse.ArgumentParser:
     choice.add_argument("--as-of", help="newest snapshot on or before this date")
     p.add_argument("--path", help="only this file or folder inside the snapshot")
     p.set_defaults(func=_cmd_restore)
+
+    p = sub.add_parser("scan", help="look for deleted files on a drive or in an image")
+    p.add_argument("source")
+    p.set_defaults(func=_cmd_scan)
+
+    p = sub.add_parser("recover", help="bring deleted files back, onto a different drive")
+    p.add_argument("source")
+    p.add_argument("--to", required=True, help="folder on a DIFFERENT drive to recover into")
+    p.add_argument(
+        "--name", action="append", default=None,
+        help="only this deleted file (may be given more than once)",
+    )
+    p.set_defaults(func=_cmd_recover)
+
+    p = sub.add_parser("rescue", help="clone a failing drive to an image, gently")
+    p.add_argument("source")
+    p.add_argument("destination", help="the image file to create (or resume)")
+    p.add_argument("--map", default=None, help="progress file (default: beside the image)")
+    p.set_defaults(func=_cmd_rescue)
 
     return parser
 
