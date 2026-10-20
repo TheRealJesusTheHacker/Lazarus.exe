@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lazarus"
+version = "0.2.0"
+description = "LAZARUS.EXE — Sentinel Safeguard LLC backup, restore, and file recovery for Windows."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Sentinel Safeguard LLC" }]
+
+[project.scripts]
+lazarus = "lazarus.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lazarus*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
