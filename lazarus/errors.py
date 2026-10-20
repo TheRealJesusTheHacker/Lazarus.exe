@@ -35,5 +35,25 @@ class RestoreRefusedError(LazarusError):
     """A safety rule stopped the restore before anything was written."""
 
 
+class SourceError(LazarusError):
+    """A drive or drive image could not be opened or read."""
+
+
+class UnsupportedFilesystemError(LazarusError):
+    """The image holds a filesystem Lazarus cannot read yet."""
+
+
+class UndeleteError(LazarusError):
+    """A scan for deleted files could not be carried out."""
+
+
+class RecoveryRefusedError(LazarusError):
+    """A safety rule stopped a recovery before anything was written."""
+
+
+class RescueError(LazarusError):
+    """A drive rescue could not start, or had to stop."""
+
+
 class NothingToRestoreError(LazarusError):
     """The chosen snapshot holds nothing matching what was asked for."""
