@@ -102,6 +102,8 @@ project scaffold: the plan, the package stub, and the license. The
 build runs in phases, restoration first — see the
 [roadmap](docs/ROADMAP.md).
 
+A portable no-install edition (folder/USB, Argus Portable pattern) is a named Phase 5 deliverable and will ship alongside the installer — see the roadmap.
+
 ## License
 
 Proprietary — see [LICENSE](LICENSE). © 2026 Sentinel Safeguard
