@@ -48,6 +48,14 @@ release of LAZARUS.EXE.
   text-mode audit (2026-10-20); regression tests model the Windows
   runtime and drive a real rescue end to end
   (`tests/test_rescue_binary_mode.py`).
+- **Scanning and rescue now run on Windows at all** — the
+  drive-reading and image-writing code used two system
+  operations that only some systems provide (positioned read
+  and write); on Windows they do not exist, so a scan or a
+  rescue there would have failed before reading a single byte.
+  Both now use the positioned read and write each system
+  offers, with the same bytes landing in the same places, and
+  the release workflow's full-suite run on Windows proves it.
 
 ### Notes
 
@@ -68,7 +76,12 @@ release of LAZARUS.EXE.
   build then caught one last interaction (the packaged program's
   start-up self-check could wait forever on a close-confirmation
   dialog nobody could see), which was fixed, pinned, and proven
-  on a rebuilt packaged program before release.
+  on a rebuilt packaged program before release. The release gate
+  then did its own work: the first Windows runs of the full
+  suite caught a test that could not start on Windows, window
+  tests waiting on real Windows tools, and the
+  positioned-read/write problem above — each fixed and re-proven
+  before this release shipped.
 - Still seam-only until a real Windows run: Task Scheduler
   registration firing, manage-bde accepting a key, the installer
   and the window on a real machine — the full list is in the

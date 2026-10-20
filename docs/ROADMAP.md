@@ -392,7 +392,15 @@ fix and found no regressions; the release proof build then
 caught one last interaction — the packaged program's start-up
 self-check waiting on the mid-job close dialog — which was
 fixed, pinned, and proven on a rebuilt packaged program before
-release.
+release. The tag-gated workflow then earned its keep on the
+first cuts: the Windows suite run caught, in turn, a POSIX-only
+test model that stopped collection, window tests shelling out
+to real PowerShell and manage-bde with no timeout, and — the
+real one — the engine's positioned read/write calls that
+Windows does not provide, which would have kept scanning and
+rescue from running there at all. All were fixed before the
+release shipped; nothing here was published from a failed or
+partial run.
 
 Three honest residuals, recorded rather than hidden: (1) pointing
 the window at a pipe or socket as a scan/rescue/snapshot source
