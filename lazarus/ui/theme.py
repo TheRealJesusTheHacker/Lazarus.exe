@@ -1,34 +1,74 @@
-"""The Lazarus look: green on black, and nothing purple, ever.
+"""The Lazarus look: first light — warm stone-black, bone, and
+ember amber, and nothing purple, ever.
+
+Lazarus's own face, from the fleet namesake palette program
+(2026-10-20): resurrection at dawn. The window sits on warm
+stone-black, the words are soft bone-white, and the primary —
+headings, accents, the main buttons — is ember amber, the first
+light coming back; quiet information headings take the pale dawn
+accent. Before v1.0.2 the window wore the shared Sentinel green;
+the engines underneath did not change, only the colours did.
 
 Every colour the window uses lives here, by name, so the contrast
 of every text/background pairing the window actually uses can be
 checked in one place (``PAIRINGS`` below, pinned by
 ``tests/test_ui_theme.py`` at 4.5:1 or better — the WCAG AA floor
-for ordinary text). Red appears only as the accent on the two
-destructive final actions (running a decryptor, applying a tidy-up)
-and as the words of a problem heading; it is never a background for
-body text and never decoration.
+for ordinary text). Danger is the fleet red (#b03a2e, white
+words) — the same red every Sentinel tool uses — kept for the
+destructive final actions (running a decryptor, applying a
+tidy-up) and, in its lighter reading tone, for problem headings;
+it is never a background for body text and never decoration.
 """
 
 from __future__ import annotations
 
 # -- the palette -------------------------------------------------------
+#
+# Namesake palette (fleet program, 2026-10-20): warm stone-black
+# base, bone text, ember amber primary ("first light"), pale dawn
+# accent. Measured contrast ratios (WCAG) are noted per colour;
+# tests/test_ui_theme.py recomputes and pins every pairing in
+# PAIRINGS below.
 
-BG = "#060a07"  # the window itself: near-black, green-tinted
-PANEL = "#0c130d"  # panels and cards sitting on the window
-PANEL_RAISED = "#111a12"  # a panel lifted one step (inputs, banners)
-TEXT = "#e8f2ea"  # the words people read
-TEXT_FAINT = "#7d927f"  # quieter words: still 5.3:1 or better everywhere used
-TEXT_DISABLED = "#9db3a0"  # disabled words — lighter than faint on purpose:
-# a disabled control must stay readable, so its colour is chosen to
-# clear 4.5:1 on every panel colour, not to look washed out.
-GREEN = "#2ee06f"  # the brand green: headings, accents, primary buttons
-GREEN_DARK = "#14532d"  # selection background behind TEXT
-GREEN_ON_DARK_TEXT = "#06130a"  # the words on a GREEN button
-BORDER = "#223526"  # hairlines between panels (not text; no ratio owed)
-WHITE = "#ffffff"  # the words on the red accent
-RED = "#a31f1f"  # accent background for the two destructive final actions
-RED_TEXT = "#ff8a7a"  # problem headings, on BG/PANEL only
+BG = "#0d0a07"  # the window itself: warm stone-black
+PANEL = "#171209"  # panels and cards sitting on the window
+PANEL_RAISED = "#120d08"  # the inset tier (inputs, banners): the
+# palette's input background — inputs sit IN the surface
+TEXT = "#f2ead9"  # the words people read: soft bone-white
+#   16.50 on BG · 15.57 on PANEL · 16.15 on PANEL_RAISED
+TEXT_FAINT = "#b3a58c"  # quieter words
+#   8.16 on BG · 7.70 on PANEL · 7.98 on PANEL_RAISED
+TEXT_DISABLED = "#9a8c6f"  # disabled words — its own colour, not a
+# faded copy of the faint: chosen to clear 4.5:1 on every surface
+#   5.97 on BG · 5.64 on PANEL · 5.85 on PANEL_RAISED
+GREEN = "#f0a13c"  # the primary: ember amber, "first light" —
+# headings, accents, primary buttons. GREEN is the name the
+# stylesheet and the odds chips have read since v1.0.0; the
+# colour under it is Lazarus's own now (see PRIMARY below).
+#   9.28 on BG · 8.76 on PANEL · 9.08 on PANEL_RAISED
+GREEN_DARK = "#4d3416"  # selection background behind TEXT:
+# GREEN mixed 28% over BG (derived from the pair, pinned)
+#   TEXT on it: 9.65
+GREEN_ON_DARK_TEXT = "#1a0f02"  # the words on a GREEN button: 8.87
+ACCENT = "#d8c391"  # pale dawn — quiet information headings
+#   11.41 on BG · 10.77 on PANEL · 11.17 on PANEL_RAISED
+BORDER = "#33291a"  # hairlines between panels (not text; no ratio owed)
+WHITE = "#ffffff"  # the words on the red accent: 6.02 on RED
+RED = "#b03a2e"  # the fleet danger red, shared by every Sentinel
+# tool: accent background for the destructive final actions
+RED_TEXT = "#ff8a7a"  # problem headings, on BG/PANEL only — the
+# fleet red's lighter reading tone: 8.62 on BG · 8.14 on PANEL
+
+# Spec-name aliases — the namesake palette spec names these roles
+# PRIMARY / PRIMARY_DARK_TEXT / INPUT_BG / PANEL_BORDER /
+# DISABLED_TEXT; the aliases keep the spec and this module
+# traceable to each other. Same colours, second names.
+PRIMARY = GREEN
+PRIMARY_DARK_TEXT = GREEN_ON_DARK_TEXT
+SELECTION = GREEN_DARK
+INPUT_BG = PANEL_RAISED
+PANEL_BORDER = BORDER
+DISABLED_TEXT = TEXT_DISABLED
 
 #: Every (foreground, background, where-it-is-used) pairing the
 #: window relies on. The theme test computes each one and refuses
@@ -48,7 +88,10 @@ PAIRINGS: list[tuple[str, str, str]] = [
     (GREEN, BG, "headings and accents on the window"),
     (GREEN, PANEL, "headings and accents on a panel"),
     (GREEN, PANEL_RAISED, "accents on a raised panel"),
-    (GREEN_ON_DARK_TEXT, GREEN, "words on a primary (green) button"),
+    (GREEN_ON_DARK_TEXT, GREEN, "words on a primary (ember) button"),
+    (ACCENT, BG, "information headings on the window"),
+    (ACCENT, PANEL, "information headings on a panel"),
+    (ACCENT, PANEL_RAISED, "information headings on a raised panel"),
     (WHITE, RED, "words on a destructive-action button"),
     (RED_TEXT, BG, "problem headings on the window"),
     (RED_TEXT, PANEL, "problem headings on a panel"),
@@ -111,7 +154,7 @@ QLabel#problemTitle {{
     font-size: 14px; font-weight: 700; color: {RED_TEXT};
 }}
 QLabel#infoTitle {{
-    font-size: 14px; font-weight: 700; color: {GREEN};
+    font-size: 14px; font-weight: 700; color: {ACCENT};
 }}
 QPushButton {{
     background: {PANEL_RAISED};

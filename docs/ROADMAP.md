@@ -465,4 +465,8 @@ on real NTFS volumes and a real failing drive.
   non-technical people Sentinel serves. No raw OS errors, ever.
 - **Audit everything.** Build → audit → fix → re-audit, per
   Sentinel's standing rule across the fleet.
-- Brand: green and black. No purple anywhere.
+- Brand: Lazarus's own dawn colours — warm stone-black, bone,
+  and ember amber (the fleet namesake palette; the window took
+  them in v1.0.2, having opened in the shared Sentinel green).
+  No purple anywhere. Danger is the fleet red every Sentinel
+  tool shares.

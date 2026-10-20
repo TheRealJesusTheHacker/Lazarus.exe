@@ -10,7 +10,7 @@ from lazarus.ui import theme
 def test_contrast_ratio_sanity():
     assert theme.contrast_ratio("#000000", "#ffffff") > 20.9
     assert theme.contrast_ratio("#ffffff", "#000000") > 20.9
-    assert theme.contrast_ratio("#2ee06f", "#2ee06f") == 1.0
+    assert theme.contrast_ratio("#f0a13c", "#f0a13c") == 1.0
     assert 4.0 < theme.contrast_ratio("#767676", "#ffffff") < 5.0
 
 
@@ -52,13 +52,37 @@ def test_no_purple_hex_hiding_in_the_stylesheet():
         assert not (blue > red and blue > green), f"{value} in stylesheet reads purple"
 
 
-def test_the_five_brand_colours_are_the_ones_specified():
-    assert theme.BG == "#060a07"
-    assert theme.PANEL == "#0c130d"
-    assert theme.TEXT == "#e8f2ea"
-    assert theme.TEXT_FAINT == "#7d927f"
-    assert theme.GREEN == "#2ee06f"
-    assert theme.GREEN_DARK == "#14532d"
+def test_the_brand_colours_are_the_ones_specified():
+    # The namesake palette (fleet program, 2026-10-20): warm
+    # stone-black, bone, ember amber — "first light". Pinned so a
+    # well-meaning pass cannot drift the face back to the shared
+    # fleet green or anywhere else.
+    assert theme.BG == "#0d0a07"
+    assert theme.PANEL == "#171209"
+    assert theme.PANEL_RAISED == "#120d08"
+    assert theme.TEXT == "#f2ead9"
+    assert theme.TEXT_FAINT == "#b3a58c"
+    assert theme.TEXT_DISABLED == "#9a8c6f"
+    assert theme.GREEN == "#f0a13c"
+    assert theme.GREEN_DARK == "#4d3416"
+    assert theme.GREEN_ON_DARK_TEXT == "#1a0f02"
+    assert theme.ACCENT == "#d8c391"
+    assert theme.BORDER == "#33291a"
+
+
+def test_danger_is_the_fleet_red_in_every_tool():
+    assert theme.RED == "#b03a2e"
+    assert theme.WHITE == "#ffffff"
+    assert theme.RED_TEXT == "#ff8a7a"
+
+
+def test_spec_name_aliases_carry_the_same_colours():
+    assert theme.PRIMARY == theme.GREEN
+    assert theme.PRIMARY_DARK_TEXT == theme.GREEN_ON_DARK_TEXT
+    assert theme.SELECTION == theme.GREEN_DARK
+    assert theme.INPUT_BG == theme.PANEL_RAISED
+    assert theme.PANEL_BORDER == theme.BORDER
+    assert theme.DISABLED_TEXT == theme.TEXT_DISABLED
 
 
 def test_disabled_text_is_its_own_readable_colour():

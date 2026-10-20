@@ -2,6 +2,39 @@
 
 All notable changes to LAZARUS.EXE are recorded here, newest first.
 
+## [1.0.2] — 2026-10-20
+
+The window gets Lazarus's own colours. Nothing about how
+Lazarus works has changed — every engine, every safeguard, and
+every fix from v1.0.1 stands exactly as it was.
+
+### Changed
+
+- **The Lazarus look: first light** — the window no longer wears
+  the shared Sentinel green. It now sits on warm stone-black
+  with soft bone-white words, ember amber for headings and the
+  main actions, and a pale dawn tone for quiet information
+  headings — resurrection colours, Lazarus's own, chosen the
+  same way every Sentinel tool now carries the colours of what
+  it is named for. The same five pages, the same words, the same
+  layout; only the colours moved. Danger keeps the one red
+  every Sentinel tool shares, so a destructive action still
+  reads as danger at a glance.
+- Every text/background pairing the window uses was recomputed
+  and re-verified at 4.5:1 or better (the weakest is 5.64:1),
+  and all twenty-one window states were re-rendered and checked
+  on the renders themselves: no light backgrounds, and no
+  purple anywhere.
+
+### Notes
+
+- Still unproven on real hardware, and said plainly: how the
+  new colours look on a real Windows desktop joins the existing
+  Windows-hardware verification list. Restores and store paths
+  longer than Windows' classic 260-character limit remain
+  unproven exactly as v1.0.1 left them — this release changes
+  neither fact in either direction.
+
 ## [1.0.1] — 2026-10-20
 
 Kit-wide Windows bug hunt: defects a physical Windows test would

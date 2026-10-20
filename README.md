@@ -2,7 +2,7 @@
 
 **Sentinel Safeguard LLC — backup, restore, and file recovery for Windows.**
 
-[![Version](https://img.shields.io/badge/version-v1.0.1-2ee06f?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
+[![Version](https://img.shields.io/badge/version-v1.0.2-f0a13c?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/TheRealJesusTheHacker/Lazarus.exe)
 [![Python](https://img.shields.io/badge/Python-3-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Proprietary-b03a2e?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/LICENSE)
@@ -119,6 +119,14 @@ MISSING, TARGET FULL, STORE DAMAGED, NEVER RUN, OVERDUE, or
 UNFINISHED, with the numbers and what to do — then setup, run
 now, history, and the tidying rule with its preview. The
 command line remains, unchanged.
+
+**v1.0.2** gives the window Lazarus's own colours — warm
+stone-black, bone-white words, and ember amber, the first light
+of the story it is named for — where it opened in the shared
+Sentinel green before. Same pages, same words, nothing moved;
+danger still wears the one red every Sentinel tool shares.
+(v1.0.1 before it carried the Windows fixes from the kit-wide
+bug hunt.)
 
 Downloads, on the releases page: **Lazarus.exe** — one file;
 run it and it offers, once, to install itself (a copy in
