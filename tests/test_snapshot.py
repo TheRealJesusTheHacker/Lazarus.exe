@@ -15,6 +15,14 @@ def _entries_by_path(manifest):
     return {e.path: e for e in manifest.entries}
 
 
+def _plain_target(value: str) -> str:
+    # Windows reports absolute link targets in extended-length
+    # form (\\?\C:\...); it is the same file as the plain path,
+    # so strip that prefix from both sides before comparing.
+    prefix = "\\" + "\\" + "?" + "\\"
+    return value[len(prefix) :] if value.startswith(prefix) else value
+
+
 def test_snapshot_of_folder_tree(store, tree):
     manifest = create_snapshot(store, tree, label="first save")
     entries = _entries_by_path(manifest)
@@ -99,12 +107,15 @@ def test_symlinks_are_recorded_as_links(store, tree):
     manifest = create_snapshot(store, tree)
     entry = _entries_by_path(manifest)["quick-notes"]
     assert entry.type == TYPE_SYMLINK
-    assert entry.target == str(target)
+    assert _plain_target(entry.target) == _plain_target(str(target))
 
 
 def test_snapshot_records_mtime(store, tree):
     notes = tree / "docs" / "notes.txt"
-    known_ns = 1_700_000_000_123_456_789
+    # A whole number of 100 ns units: Windows timestamps have
+    # 100 ns granularity, so this instant round-trips exactly on
+    # both Windows and POSIX.
+    known_ns = 1_700_000_000_123_456_700
     os.utime(notes, ns=(known_ns, known_ns))
     manifest = create_snapshot(store, tree)
     entry = _entries_by_path(manifest)["docs/notes.txt"]

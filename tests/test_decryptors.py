@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import sys
 
 import pytest
 
@@ -475,6 +476,10 @@ def test_an_address_with_a_broken_port_is_refused(tmp_path):
     _load_poisoned(tmp_path, payload)
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the crafted name uses characters Windows filenames cannot contain",
+)
 def test_a_crafted_file_name_cannot_reach_the_terminal_raw(
     tmp_path, registry
 ):

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -88,6 +89,18 @@ def write_script(tmp_path: Path, name: str, body: str) -> Path:
     script = tmp_path / name
     script.write_text(body, encoding="utf-8")
     script.chmod(script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+    if os.name == "nt":
+        # Windows cannot execute a shebang script by path, so the
+        # body also goes in a .py sibling and a .cmd shim runs it
+        # with this Python; subprocess executes .cmd files, and the
+        # exit code, stdin and timeout behaviour carry through.
+        py_script = tmp_path / f"{name}.py"
+        py_script.write_text(body, encoding="utf-8")
+        shim = tmp_path / f"{name}.cmd"
+        shim.write_text(
+            f'"{sys.executable}" "{py_script}" %1 %2\n', encoding="utf-8"
+        )
+        return shim
     return script
 
 
@@ -624,6 +637,10 @@ def test_a_decryptor_reading_input_gets_an_empty_answer_at_once(
     assert (work.output_dir / "answer.txt").read_bytes() == b"read 0 bytes"
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the crafted name uses characters Windows filenames cannot contain",
+)
 def test_prepare_problems_print_a_crafted_name_safely(tmp_path):
     source = tmp_path / "locked"
     source.mkdir()
@@ -641,6 +658,10 @@ def test_prepare_problems_print_a_crafted_name_safely(tmp_path):
     assert any("evil?FAKE?[31m.txt" in problem for problem in work.problems)
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the crafted name uses characters Windows filenames cannot contain",
+)
 def test_run_problems_print_a_crafted_name_safely(tmp_path, toy_decryptor):
     source = tmp_path / "locked"
     source.mkdir()

@@ -50,7 +50,11 @@ def _ntfs_bytes() -> bytes:
     return builder.build()
 
 
-@pytest.mark.parametrize("parser,base", [(fs_fat, _fat_bytes()), (fs_ntfs, _ntfs_bytes())])
+@pytest.mark.parametrize(
+    "parser,base",
+    [(fs_fat, _fat_bytes()), (fs_ntfs, _ntfs_bytes())],
+    ids=["mutated-fat", "mutated-ntfs"],
+)
 def test_parser_survives_mutated_images(parser, base):
     rng = random.Random(20261020)
     for _ in range(150):
@@ -173,7 +177,7 @@ def test_destination_that_is_a_file_is_refused_plainly(tmp_path):
     image = fat_image.create_fat16()
     record = image.add_file("", "A.TXT", b"data data")
     image.delete(record)
-    src = Path("/tmp") / "lazarus-audit-dest-src.img"
+    src = tmp_path / "lazarus-audit-dest-src.img"
     src.write_bytes(bytes(image.data))
     blocker = tmp_path / "blocker"
     blocker.write_bytes(b"x")

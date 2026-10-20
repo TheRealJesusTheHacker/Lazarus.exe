@@ -739,6 +739,8 @@ def test_fifo_rescue_destination_is_refused_plainly(controller, tmp_path):
 def test_socket_source_is_refused_plainly(controller, tmp_path):
     import socket
 
+    if not hasattr(socket, "AF_UNIX"):
+        pytest.skip("this computer has no unix sockets")
     sock_path = tmp_path / "the-socket"
     sock = socket.socket(socket.AF_UNIX)
     try:
@@ -799,6 +801,8 @@ def test_symlink_to_fifo_rescue_destination_is_refused_plainly(controller, tmp_p
 def test_symlink_to_socket_source_is_refused_plainly(controller, tmp_path):
     import socket
 
+    if not hasattr(socket, "AF_UNIX"):
+        pytest.skip("this computer has no unix sockets")
     sock_path = tmp_path / "the-socket"
     sock = socket.socket(socket.AF_UNIX)
     try:

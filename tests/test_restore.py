@@ -22,6 +22,14 @@ def _outcomes(report):
     return {item.path: item.outcome for item in report.items}
 
 
+def _plain_target(value: str) -> str:
+    # Windows reports absolute link targets in extended-length
+    # form (\\?\C:\...); it is the same file as the plain path,
+    # so strip that prefix from both sides before comparing.
+    prefix = "\\" + "\\" + "?" + "\\"
+    return value[len(prefix) :] if value.startswith(prefix) else value
+
+
 def test_restore_everything_to_a_fresh_folder(store, tree, tmp_path):
     manifest = create_snapshot(store, tree)
     out = tmp_path / "brought-back"
@@ -149,7 +157,9 @@ def test_restore_recreates_symlinks(store, tree, tmp_path):
     assert report.status == "complete"
     restored_link = out / "quick-notes"
     assert restored_link.is_symlink()
-    assert os.readlink(restored_link) == str(tree / "docs" / "notes.txt")
+    assert _plain_target(os.readlink(restored_link)) == _plain_target(
+        str(tree / "docs" / "notes.txt")
+    )
 
 
 def test_restore_never_deletes_newer_files(store, tree, tmp_path):

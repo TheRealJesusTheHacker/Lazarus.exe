@@ -9,7 +9,9 @@ SubprocessRunner, so the CLI's wiring is what is on trial here.
 
 from __future__ import annotations
 
+import os
 import stat
+import sys
 from pathlib import Path
 
 from lazarus import cli
@@ -44,6 +46,27 @@ if __name__ == "__main__":
 
 def xor(data: bytes) -> bytes:
     return bytes(b ^ XOR_KEY for b in data)
+
+
+def _write_executable_script(tmp_path: Path, name: str, body: str) -> Path:
+    script = tmp_path / name
+    script.write_text(body, encoding="utf-8")
+    script.chmod(
+        script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+    )
+    if os.name == "nt":
+        # Windows cannot execute a shebang script by path, so the
+        # body also goes in a .py sibling and a .cmd shim runs it
+        # with this Python; subprocess executes .cmd files, and the
+        # exit code, stdin and timeout behaviour carry through.
+        py_script = tmp_path / f"{name}.py"
+        py_script.write_text(body, encoding="utf-8")
+        shim = tmp_path / f"{name}.cmd"
+        shim.write_text(
+            f'"{sys.executable}" "{py_script}" %1 %2\n', encoding="utf-8"
+        )
+        return shim
+    return script
 
 
 class FakePlatform:
@@ -162,11 +185,7 @@ def test_cli_identify_unknown_folder_says_so_plainly(tmp_path, capsys):
 
 def test_cli_decrypt_end_to_end_on_copies(tmp_path, capsys):
     folder = _stop_folder(tmp_path)
-    script = tmp_path / "toy-decryptor"
-    script.write_text(TOY_DECRYPTOR, encoding="utf-8")
-    script.chmod(
-        script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
-    )
+    script = _write_executable_script(tmp_path, "toy-decryptor", TOY_DECRYPTOR)
     work = tmp_path / "work"
     original_before = (folder / "photo.jpg.djvu").read_bytes()
 
@@ -258,12 +277,7 @@ def _avaddon_folder(tmp_path: Path) -> Path:
 
 
 def _toy_script(tmp_path: Path) -> Path:
-    script = tmp_path / "toy-decryptor"
-    script.write_text(TOY_DECRYPTOR, encoding="utf-8")
-    script.chmod(
-        script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
-    )
-    return script
+    return _write_executable_script(tmp_path, "toy-decryptor", TOY_DECRYPTOR)
 
 
 def test_cli_decrypt_on_a_suggestion_only_stops(tmp_path, capsys):
@@ -351,10 +365,8 @@ def test_cli_decrypt_stops_a_decryptor_that_never_finishes(
 ):
     monkeypatch.setattr(cli, "_DECRYPT_TIMEOUT_SECONDS", 1)
     folder = _stop_folder(tmp_path)
-    script = tmp_path / "sleeping-decryptor"
-    script.write_text(SLEEPING_DECRYPTOR, encoding="utf-8")
-    script.chmod(
-        script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+    script = _write_executable_script(
+        tmp_path, "sleeping-decryptor", SLEEPING_DECRYPTOR
     )
 
     code = cli.main(
