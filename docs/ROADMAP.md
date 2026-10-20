@@ -67,7 +67,49 @@ Windows-hardware run is still to come.
 - Read-only against the source, always — enforced by the same kind
   of test-pinned safety assertions the rest of the medic kit uses.
 
-**Status: PLANNED.**
+**Status: COMPLETE — shipped in v0.3.0.**
+
+As built: two filesystem parsers behind one odds engine. The FAT
+parser walks every folder of a FAT12/16/32 drive and gathers the
+entries deletion marked, saying openly that the stretch of pieces
+it reports is the usual unbroken-run assumption — deletion erased
+the map that would prove it — with each piece judged by whether
+the table now counts it as back in use. The NTFS parser walks the
+Master File Table record by record, applying each record's own
+fixup before trusting it; small files come back with the contents
+that live inside their record, and larger files are reported as
+the stretches they sat in, split by the drive's own in-use map
+($BITMAP). The odds engine weighs only that evidence — likely
+whole, partly there (damage stated in bytes), or gone — and counts
+anything the drive cannot testify about as at risk, never as safe.
+Recovery writes only to a folder on a different device than the
+source's — the same-device refusal fires before a byte is written
+— flattens names from drive records into safe single file names,
+and hashes everything it writes. The rescue engine clones through
+a progress map of regions and holes: first pass one read per
+region, later passes in smaller pieces, the map saved before the
+first read and after every region, resumable across runs, and
+refusing — in plain language — corrupt maps and any placement of
+the progress file on the image or the source. Every source is
+opened read-only through a single seam with no write path.
+Proven by a 79-test Phase 2 suite (142 in all) including a
+hostile-input audit battery kept as permanent tests.
+
+Filesystem coverage, proven vs pending — proven means the parser
+is exercised end-to-end against ground-truth images built
+independently of it:
+
+| Filesystem | State | How it is proven |
+|---|---|---|
+| FAT12 / FAT16 / FAT32 | Proven | Independent spec-built images: intact, partly reused, and fully reused deletions; long names; subfolders; erased start records |
+| NTFS (MFT-record scan) | Proven | Independent spec-built images: resident and non-resident files, $BITMAP split verdicts, fixup-damaged records skipped and counted |
+| NTFS folder-index / journal recovery | Pending | Records the MFT scan cannot see are out of reach until a later phase walks indexes and the journal |
+| ext2 / ext4 and others | Pending | Not yet read; such a drive is refused in plain language, never guessed at |
+
+Verified on Linux against synthetic images and synthetic failing
+drives. The first run against real Windows hardware — a real
+failing drive, real deleted NTFS system volumes — is still to
+come, and nothing above claims otherwise.
 
 ## Phase 3 — Decrypt & unlock files off drives
 
