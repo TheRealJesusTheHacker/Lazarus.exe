@@ -32,7 +32,26 @@ The key phase. Lazarus's reason to exist.
 - **Plain-language restore reports** — designed failure states, no
   raw OS errors ever surfaced.
 
-**Status: PLANNED.**
+**Status: COMPLETE — shipped in v0.2.0.**
+
+As built: a content-addressed snapshot store (file contents kept
+once, named by SHA-256; per-snapshot manifests written atomically,
+so an interrupted save reads as unfinished, never as trustworthy),
+and a restore engine that picks a snapshot by name or by date,
+re-hashes every saved copy it needs *before* writing anything,
+snapshots the current state of whatever it is about to overwrite
+(the undo — and if that safety copy cannot be completed, the
+restore stops before changing a byte), writes each file to a
+temporary name and hash-checks it before it lands, and finishes
+with the plain-language report. The safety rules live in the
+engine, not the interface: a restore never writes outside its
+destination (doctored records, backslash paths, duplicate entries,
+and shortcut write-throughs are all refused), the store never
+snapshots itself, and restores never delete newer work. Proven by
+a 63-test suite and an independent audit round — 17 findings, all
+fixed and re-probed. A command-line interface ships now; the
+animated HUD is Phase 5. Verified on Linux; the first
+Windows-hardware run is still to come.
 
 ## Phase 2 — Undelete + drive rescue
 
