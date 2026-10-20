@@ -308,9 +308,24 @@ class SchedulerPlatform(Protocol):
         ...
 
 
+#: No Windows tool gets forever. A hung manage-bde, PowerShell, or
+#: schtasks must become a designed, plain-language failure (the
+#: callers translate every executor failure), never a Lazarus that
+#: hangs on a spinning page with no way back.
+_EXECUTE_TIMEOUT_SECONDS = 30
+
+
 def _subprocess_execute(argv: list[str]) -> tuple[int, str]:
     """The real run: one command, no shell, words captured not shown."""
-    result = subprocess.run(argv, shell=False, capture_output=True, text=True)
+    result = subprocess.run(
+        argv,
+        shell=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=_EXECUTE_TIMEOUT_SECONDS,
+    )
     return result.returncode, result.stdout
 
 

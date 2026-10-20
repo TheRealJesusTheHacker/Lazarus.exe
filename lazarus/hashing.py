@@ -70,7 +70,7 @@ def is_valid_hash(value: object) -> bool:
 def fsync_file(path: Path) -> None:
     """Flush a file's bytes to disk (best effort, cross-platform)."""
     try:
-        fd = os.open(path, os.O_RDWR)
+        fd = os.open(path, os.O_RDWR | getattr(os, "O_BINARY", 0))
     except OSError:
         return
     try:

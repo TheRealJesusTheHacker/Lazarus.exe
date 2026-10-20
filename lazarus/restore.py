@@ -123,6 +123,26 @@ def _check_destination(store: SnapshotStore, destination: Path) -> Path:
     return dest
 
 
+def _is_link_like(path: Path) -> bool:
+    """True for a symlink OR a Windows directory junction.
+
+    ``os.path.islink`` recognises junctions only inconsistently
+    across Python builds; a junction is a reparse point that writing
+    through follows just like a symlink, so a guard that misses it
+    lets a restore escape the folder the user chose. Python 3.12+
+    names the check directly — use it wherever it exists.
+    """
+    if os.path.islink(path):
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if callable(is_junction):
+        try:
+            return bool(is_junction())
+        except OSError:
+            return False
+    return False
+
+
 def _blocked_reason(dest: Path, entry: FileEntry) -> Optional[str]:
     """Why writing this item could escape the destination, or None.
 
@@ -136,7 +156,7 @@ def _blocked_reason(dest: Path, entry: FileEntry) -> Optional[str]:
     current = dest
     for part in parts[:-1]:
         current = current / part
-        if os.path.islink(current):
+        if _is_link_like(current):
             return (
                 "A shortcut is sitting where a folder in its path "
                 "belongs, so it was left alone. Lazarus never writes "
@@ -202,7 +222,7 @@ def _restore_file(
 
 
 def _restore_dir(entry: FileEntry, dest_path: Path) -> RestoreItem:
-    if dest_path.is_symlink():
+    if _is_link_like(dest_path):
         return RestoreItem(
             entry.path,
             OUTCOME_FAILED,
@@ -294,13 +314,16 @@ def restore(
                 "restore folder, so the whole restore was stopped before "
                 "anything was written. The snapshot cannot be trusted."
             )
-        if entry.path in seen_paths:
+        folded = entry.path.casefold()
+        if folded in seen_paths:
             raise RestoreRefusedError(
-                "This snapshot's record lists the same item twice, so "
-                "the whole restore was stopped before anything was "
+                "This snapshot's record lists the same item twice — "
+                "or two items whose names differ only in letter "
+                "case, which are the same name on Windows — so the "
+                "whole restore was stopped before anything was "
                 "written. The snapshot cannot be trusted."
             )
-        seen_paths.add(entry.path)
+        seen_paths.add(folded)
 
     if destination is None:
         if not manifest.source_root:

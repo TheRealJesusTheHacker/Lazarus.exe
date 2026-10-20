@@ -397,7 +397,16 @@ class RecoveryReport:
         }
 
 
-_UNSAFE_CHARS = set('/\\\x00')
+_UNSAFE_CHARS = set('/\\\x00:')
+
+#: Names Windows reserves for devices, in every folder, with any
+#: extension. A recovered file written onto one of these names does
+#: not land on disk — it talks to a device, or fails outright.
+_WINDOWS_RESERVED_STEMS = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{i}" for i in range(1, 10)}
+    | {f"LPT{i}" for i in range(1, 10)}
+)
 
 
 def _safe_output_name(raw: str, taken: set[str]) -> str:
@@ -408,8 +417,15 @@ def _safe_output_name(raw: str, taken: set[str]) -> str:
     cleaned = "".join(
         "_" if (ch in _UNSAFE_CHARS or ord(ch) < 32) else ch for ch in raw
     ).strip()
+    # Windows strips trailing dots and spaces from a name, so a
+    # record ending in either would land on top of a different file
+    # than the one the report names. Take them off here instead,
+    # where the change is visible in the name Lazarus reports.
+    cleaned = cleaned.rstrip(". ")
     if cleaned in ("", ".", ".."):
         cleaned = "recovered-file"
+    if cleaned.split(".", 1)[0].upper() in _WINDOWS_RESERVED_STEMS:
+        cleaned = "_" + cleaned
     stem, dot, ext = cleaned.rpartition(".")
     candidate = cleaned
     n = 2

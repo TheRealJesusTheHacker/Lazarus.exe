@@ -268,7 +268,13 @@ def create_snapshot(
             for name in dirnames:
                 abs_path = current / name
                 rel_path = _rel(abs_path, root)
-                if abs_path.is_symlink():
+                if abs_path.is_symlink() or (
+                    callable(getattr(abs_path, "is_junction", None))
+                    and abs_path.is_junction()
+                ):
+                    # A junction is a shortcut too (Windows): record
+                    # it as one, never walk through it into whatever
+                    # it points at.
                     if _wanted(rel_path, include_set):
                         record_symlink(abs_path, rel_path)
                     continue

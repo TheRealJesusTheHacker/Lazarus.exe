@@ -60,7 +60,8 @@ def verify_snapshot(
                 )
             )
             continue
-        if entry.path in seen_paths:
+        folded = entry.path.casefold()
+        if folded in seen_paths:
             result.problems.append(
                 Problem(
                     path=entry.path,
@@ -68,7 +69,7 @@ def verify_snapshot(
                 )
             )
             continue
-        seen_paths.add(entry.path)
+        seen_paths.add(folded)
         if entry.type != TYPE_FILE:
             continue
         if not is_valid_hash(entry.sha256):

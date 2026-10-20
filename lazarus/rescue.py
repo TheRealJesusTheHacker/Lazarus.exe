@@ -29,13 +29,14 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .errors import RescueError, SourceError
 from .hashing import fsync_dir, fsync_file
-from .source import ReadOnlySource
+from .source import ReadOnlySource, device_id_of
 
 STATE_UNTESTED = "untested"
 STATE_RECOVERED = "recovered"
@@ -426,6 +427,53 @@ def _build_report(
     )
 
 
+def _nearest_existing_device(path: Path) -> int | None:
+    """The device ``path``'s writes would land on, or None.
+
+    The path itself may not exist yet (the image usually does
+    not), so the nearest folder above it that does exist answers.
+    """
+    probe = Path(path)
+    while not probe.exists():
+        if probe.parent == probe:
+            return None
+        probe = probe.parent
+    try:
+        return device_id_of(probe)
+    except OSError:
+        return None
+
+
+def _source_device(reader, source_path) -> int | None:
+    """The device a rescue reads from, when the source IS a device.
+
+    An image *file* is not a drive: copying it to another file on
+    the same volume overwrites nothing of the source, so it earns
+    no refusal. A real drive (or any non-regular-file source) is
+    different — writing the image onto that same drive would write
+    to the very drive being rescued.
+    """
+    # Look in the instance's own __dict__ only: the engine's
+    # contract with a handed-in source is size + read_at, and a
+    # source that was never given a device id must not be probed
+    # for one (a test pins exactly that). ReadOnlySource — every
+    # source Lazarus opens itself — carries device_id there.
+    try:
+        device_id = vars(reader).get("device_id")
+    except TypeError:
+        device_id = None
+    if device_id is None:
+        return None
+    if source_path is not None:
+        try:
+            mode = os.lstat(source_path).st_mode
+        except OSError:
+            mode = 0
+        if stat.S_ISREG(mode):
+            return None
+    return device_id
+
+
 def rescue_to_image(
     source,
     destination,
@@ -527,6 +575,22 @@ def rescue_to_image(
                 "There is nothing to rescue: the source reports a size "
                 "of zero bytes, so there is no drive to copy."
             )
+
+        source_device = _source_device(reader, source_path)
+        if source_device is not None:
+            for written_path, what in (
+                (destination_path, "image"),
+                (map_file, "progress file"),
+            ):
+                if _nearest_existing_device(written_path.parent) == source_device:
+                    raise RescueError(
+                        f"The {what} would be written onto the same "
+                        "drive Lazarus is rescuing. A rescue never "
+                        "writes to the drive it is recovering from — "
+                        "writing there could overwrite the very data "
+                        "being rescued. Pick a folder on a different "
+                        "drive."
+                    )
 
         try:
             destination_path.parent.mkdir(parents=True, exist_ok=True)

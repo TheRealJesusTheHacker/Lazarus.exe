@@ -370,10 +370,50 @@ def backup_snapshot_ids(history: History) -> set[str]:
 # cleared, and the run that clears it says so in its notes.
 
 
+def _pid_alive_windows(pid: int) -> bool:
+    """True if ``pid`` is a living process, asked of Windows itself.
+
+    ``os.kill(pid, 0)`` is NOT a liveness probe on Windows: Python
+    hands any signal other than the console control events to
+    TerminateProcess, so the "probe" would kill the very backup it
+    was checking for — and, if the pid had been reused, an unrelated
+    program. Ask the kernel instead: open the process for querying
+    and check whether it has exited.
+    """
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = ctypes.c_void_p
+    kernel32.OpenProcess.argtypes = [
+        ctypes.c_ulong,
+        ctypes.c_bool,
+        ctypes.c_ulong,
+    ]
+    kernel32.GetExitCodeProcess.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_ulong),
+    ]
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    handle = kernel32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
+    if not handle:
+        # 5 = access denied: the process is there, just not ours to
+        # open. 87 = invalid parameter: there is no such process.
+        return ctypes.get_last_error() == 5
+    try:
+        exit_code = ctypes.c_ulong(0)
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            return True  # cannot be read; assume it is still there
+        return exit_code.value == 259  # STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def _default_pid_alive(pid: int) -> bool:
     """True if a process with ``pid`` seems to be running."""
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
         return False
+    if os.name == "nt":
+        return _pid_alive_windows(pid)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

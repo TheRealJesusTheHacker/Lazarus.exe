@@ -229,6 +229,16 @@ class SnapshotInfo:
         )
 
 
+#: Names Windows reserves for devices, in every folder, with any
+#: extension: a file restored onto one of these names does not land
+#: on disk at all — it talks to a device, or fails outright.
+_WINDOWS_RESERVED_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{i}" for i in range(1, 10)}
+    | {f"LPT{i}" for i in range(1, 10)}
+)
+
+
 def is_safe_relative_path(path: object) -> bool:
     """True if ``path`` is a manifest path that cannot escape its root.
 
@@ -243,10 +253,26 @@ def is_safe_relative_path(path: object) -> bool:
         # platform) even though Linux treats them as ordinary
         # characters; a NUL byte is never legitimate in a path.
         return False
-    if path.startswith("/") or ":" in path.split("/")[0]:
-        return False  # absolute path or drive-qualified
+    if path.startswith("/"):
+        return False  # absolute path
     parts = path.split("/")
     for part in parts:
         if part in ("", ".", ".."):
+            return False
+        if ":" in part:
+            # A colon in any segment is a drive qualifier in the
+            # first segment and an alternate-data-stream separator
+            # in every other one on Windows: the bytes would land
+            # in a hidden stream, not in the file the report names.
+            return False
+        if part.endswith((".", " ")):
+            # Windows strips trailing dots and spaces from a name,
+            # so this item would land on top of a different item
+            # whose name it then matches — silently.
+            return False
+        stem = part.split(".", 1)[0].upper()
+        if stem in _WINDOWS_RESERVED_NAMES:
+            # CON, NUL, COM1 and their kin are devices on Windows,
+            # not files: nothing can be restored onto those names.
             return False
     return True

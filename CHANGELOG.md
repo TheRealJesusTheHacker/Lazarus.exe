@@ -2,6 +2,62 @@
 
 All notable changes to LAZARUS.EXE are recorded here, newest first.
 
+## [1.0.1] — 2026-10-20
+
+Kit-wide Windows bug hunt: defects a physical Windows test would
+have hit, found and fixed before it ran. Every fix has a permanent
+regression test that fails against v1.0.0 for the stated reason
+(`tests/test_kithunt_2026_10_20.py`).
+
+### Fixed
+
+- **Checking the backup lock no longer endangers the running
+  backup (Windows)** — the lock's "is that process still running"
+  check used a signal probe that, on Windows, does not probe at
+  all: it terminates the process it names. A second backup run
+  could have killed the backup already running — or, if Windows
+  had reused the process number, an unrelated program. The check
+  now asks the Windows kernel whether the process has exited,
+  and touches nothing.
+- **Windows tool calls are bounded and decode safely** — asking
+  about a BitLocker volume, registering the scheduled backup,
+  and writing the Start Menu shortcut at install time now each
+  have a 30-second limit and tolerant text decoding. A hung
+  Windows tool becomes a plain-language failure instead of a
+  Lazarus that hangs forever, and tool output with non-English
+  characters can no longer crash the reading of it.
+- **A snapshot record can no longer aim a restore at a hidden
+  Windows stream, a device, or the wrong file** — entries whose
+  names carry an alternate-data-stream colon (in any folder),
+  a reserved device name (CON, NUL, COM1, and kin), or a trailing
+  dot or space (which Windows strips, dropping the file on top
+  of a different name) are refused before anything is written,
+  and two entries whose names differ only in letter case — one
+  name, on Windows — stop the restore instead of silently
+  overwriting each other.
+- **A restore never writes through a directory junction** — the
+  shortcut guard recognised symlinks only; junctions, which
+  Windows Explorer creates and writing follows just the same,
+  are now recognised on the restore path, in folder restores,
+  and when a snapshot walks a folder.
+- **Recovered-file names are defused the same way** — a deleted
+  file whose record names a device, a data stream, or a name
+  Windows would trim is written under a safe name Lazarus
+  reports, never onto a device or into a hidden stream.
+- **A drive rescue refuses to land on the drive it is rescuing**
+  — when the source is a real drive (not an image file), an
+  image or progress file aimed at that same drive is refused
+  before a byte is written. Copying an image file to another
+  file on the same volume stays allowed: it overwrites nothing
+  of its source.
+
+### Notes
+
+- Still unproven on real hardware, and said plainly: restores
+  and store paths longer than Windows' classic 260-character
+  limit. Nothing in v1.0.1 changes that either way; it is on the
+  Windows-hardware verification list, not silently claimed.
+
 ## [1.0.0] — 2026-10-20
 
 Phase 5 — the animated interface, packaging, and the first public

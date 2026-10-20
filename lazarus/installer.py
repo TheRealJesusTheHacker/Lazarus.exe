@@ -360,6 +360,7 @@ class WindowsShell:
             shortcut_argv(target, link_path, description),
             check=True,
             capture_output=True,
+            timeout=30,
         )
 
 
