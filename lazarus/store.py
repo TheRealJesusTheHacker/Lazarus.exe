@@ -25,6 +25,8 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import shutil
+import stat
 from datetime import datetime, time, timezone
 from pathlib import Path
 from typing import Optional
@@ -38,6 +40,7 @@ from .errors import (
 from .hashing import fsync_dir, fsync_file
 from .model import (
     STORE_FORMAT,
+    TYPE_FILE,
     SnapshotInfo,
     SnapshotManifest,
 )
@@ -287,12 +290,22 @@ class SnapshotStore:
             )
         data = read_json(path)
         try:
-            return SnapshotManifest.from_dict(data)
+            manifest = SnapshotManifest.from_dict(data)
         except (KeyError, TypeError, ValueError):
             raise StoreError(
                 f"The record for snapshot '{snapshot_id}' is damaged and cannot be read. "
                 "Lazarus will not restore from a record it cannot trust."
             ) from None
+        if manifest.id != snapshot_id:
+            # The record inside the folder names a different snapshot
+            # than the folder it sits in: it cannot be trusted as
+            # this snapshot's record, however readable it looks.
+            raise StoreError(
+                f"The record for snapshot '{snapshot_id}' does not match "
+                "the snapshot it sits in. It is damaged; Lazarus will "
+                "not trust it."
+            )
+        return manifest
 
     def _refresh_index_entry(self, manifest: SnapshotManifest) -> None:
         """Rewrite the index from the manifests on disk.
@@ -400,3 +413,127 @@ class SnapshotStore:
                 "This store holds no finished snapshots yet. Take one first."
             )
         return self.load_manifest(finished[-1].id)
+
+    # -- removing snapshots and reclaiming space ----------------------
+
+    def delete_snapshot(self, snapshot_id: str) -> None:
+        """Remove one snapshot's folder and rebuild the index.
+
+        Only the snapshot's own record goes: the file contents it
+        pointed at stay in the object area until
+        :meth:`remove_unreferenced_objects` is called, because other
+        snapshots may point at the very same copies.
+        """
+        folder = self.snapshot_dir(snapshot_id)
+        if not folder.is_dir():
+            raise SnapshotNotFoundError(
+                f"There is no finished snapshot called '{snapshot_id}' in this store."
+            )
+        try:
+            shutil.rmtree(folder)
+        except OSError:
+            raise StoreError(
+                f"Lazarus could not remove snapshot '{snapshot_id}' from "
+                f"'{self.root}'. Check the drive is connected and can be "
+                "written to."
+            ) from None
+        fsync_dir(self.snapshots_dir)
+        entries = [
+            info.to_dict()
+            for info in self.list_snapshots()
+            if info.has_manifest
+        ]
+        atomic_write_json(
+            self.root / INDEX_FILE,
+            {"format": STORE_FORMAT, "snapshots": entries},
+        )
+
+    def referenced_hashes(self) -> set[str]:
+        """Every file-content hash any readable manifest still names.
+
+        All kinds count — ordinary snapshots and pre-restore safety
+        copies alike — because a copy is only spare when *nothing*
+        points at it. If a snapshot folder holds a manifest file
+        that cannot be loaded, this raises instead of guessing: a
+        caller deciding what is safe to delete must never work from
+        a partial picture of the store.
+        """
+        hashes: set[str] = set()
+        base = self.snapshots_dir
+        if not base.is_dir():
+            return hashes
+        for folder in sorted(base.iterdir()):
+            if not folder.is_dir():
+                continue
+            if not (folder / MANIFEST_FILE).exists():
+                continue  # an unfinished save names nothing yet
+            try:
+                manifest = self.load_manifest(folder.name)
+            except (StoreError, SnapshotNotFoundError):
+                raise StoreError(
+                    f"The record for snapshot '{folder.name}' could not "
+                    "be read, so Lazarus cannot tell which saved copies "
+                    "the store still needs. Nothing was deleted. Check "
+                    "the store with 'lazarus verify' and try again."
+                ) from None
+            for entry in manifest.entries:
+                if entry.type == TYPE_FILE and entry.sha256:
+                    hashes.add(entry.sha256)
+        return hashes
+
+    def remove_unreferenced_objects(self) -> tuple[int, int, int]:
+        """Delete stored copies no snapshot points at any more.
+
+        Returns ``(objects_removed, bytes_freed, skipped_young)``.
+        The set of copies still in use is worked out *first*, in
+        full, so a damaged record anywhere in the store stops the
+        sweep before a single file is touched. Only the store's own
+        object area is walked — two-letter fan-out folders and the
+        files inside them — and nothing outside it is ever touched.
+
+        A copy less than a day old is left alone and counted in
+        ``skipped_young``: it may belong to a snapshot still being
+        written by a caller outside the backup lock, and a sweep
+        must never pull a copy out from under a save in flight.
+        """
+        referenced = self.referenced_hashes()
+        removed = 0
+        freed = 0
+        skipped_young = 0
+        objects = self.objects_dir
+        if not objects.is_dir():
+            return (0, 0, 0)
+        youngest_safe = utc_now().timestamp() - 24 * 60 * 60
+        for fanout in sorted(objects.iterdir()):
+            try:
+                fanout_mode = os.lstat(fanout).st_mode
+            except OSError:
+                continue
+            if not stat.S_ISDIR(fanout_mode) or len(fanout.name) != 2:
+                # A link is never followed into a fan-out folder,
+                # however real its target looks; top-level names
+                # starting with "." are the snapshot writer's
+                # incoming files, still being copied; any other
+                # non-fan-out entry is not Lazarus's to sweep.
+                continue
+            for entry in sorted(fanout.iterdir()):
+                try:
+                    info = os.lstat(entry)
+                except OSError:
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    continue  # folders, links, and anything stranger stay
+                if entry.name in referenced:
+                    continue
+                if info.st_mtime > youngest_safe:
+                    skipped_young += 1
+                    continue  # may still be arriving; leave it alone
+                try:
+                    size = info.st_size
+                    entry.unlink()
+                except OSError:
+                    continue
+                removed += 1
+                freed += size
+            fsync_dir(fanout)
+        return (removed, freed, skipped_young)

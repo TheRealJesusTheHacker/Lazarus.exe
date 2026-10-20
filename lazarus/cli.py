@@ -16,6 +16,17 @@
     lazarus decrypt  <folder> --to WORK --decryptor PROGRAM
                     [--family NAME]
     lazarus assess   <path>
+    lazarus backup setup --store STORE --add FOLDER
+                    [--every daily|weekly] [--weekday DAY] [--at HH:MM]
+                    [--keep-count N | --keep-days N] [--verify-every N]
+                    [--register] [--program NAME] [--config FILE]
+    lazarus backup run     [--config FILE]
+    lazarus backup due     [--config FILE]
+    lazarus backup status  [--config FILE]
+    lazarus backup history [--config FILE] [--limit N]
+    lazarus backup prune   [--config FILE] [--dry-run]
+    lazarus backup register   [--config FILE] [--program NAME]
+    lazarus backup unregister [--config FILE]
 
 Exit codes: 0 = done, fully; 1 = done, but something in the report
 needs your attention (a partial restore, a failed check); 2 = Lazarus
@@ -27,17 +38,66 @@ from __future__ import annotations
 import argparse
 import getpass
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from ._version import __version__
 from .assess import assess_options
+from .backup import (
+    _acquire_run_lock,
+    _release_run_lock,
+    backup_snapshot_ids,
+    backup_status,
+    default_config_path,
+    history_path_for,
+    load_config,
+    load_history,
+    run_backup,
+    save_config,
+    validate_config,
+)
+from .backup_model import (
+    OUTCOME_COMPLETE,
+    OUTCOME_FAILED,
+    OUTCOME_PARTIAL,
+    OUTCOME_REFUSED,
+    RETENTION_COUNT,
+    RETENTION_DAYS,
+    STATE_NEVER_RUN,
+    STATE_OVERDUE,
+    STATE_READY,
+    STATE_STORE_DAMAGED,
+    STATE_TARGET_FULL,
+    STATE_TARGET_MISSING,
+    STATE_UNFINISHED,
+    TRIGGER_CATCHUP,
+    TRIGGER_MANUAL,
+    TRIGGER_SCHEDULED,
+    BackupConfig,
+    RetentionSpec,
+    ScheduleSpec,
+    human_bytes,
+)
 from .decrypt_run import SubprocessRunner, prepare_work_area, run_decryptor
 from .decryptors import find_entry, identify_family, load_registry
-from .errors import DecryptorError, LazarusError
+from .errors import (
+    BackupError,
+    DecryptorError,
+    LazarusError,
+    SourceNotFoundError,
+    StoreError,
+)
 from .rescue import rescue_to_image
 from .restore import restore
+from .retention import apply_retention, plan_retention
+from .schedule import (
+    next_scheduled_instant,
+    register_schedule,
+    run_due_backup,
+    unregister_schedule,
+)
 from .snapshot import create_snapshot
-from .store import SnapshotStore
+from .store import SnapshotStore, format_utc, new_snapshot_id, utc_now
 from .undelete import recover_deleted, scan_for_deleted
 from .unlock import default_platform, unlock_volume
 from .verify import verify_snapshot, verify_store
@@ -311,6 +371,317 @@ def _cmd_restore(args) -> int:
     return {"complete": 0, "partial": 1, "failed": 2}[report.status]
 
 
+# -- backup automation (Phase 4) -------------------------------------------
+#
+# Handlers here raise LazarusError for anything that stops the work
+# before it starts; main() prints that message plainly and returns
+# 2, exactly as it does for every other command. A handler's own
+# return value carries the finer verdict: 0 when the work finished
+# fully, 1 when it finished but needs attention.
+
+
+def _backup_config_path(args) -> Path:
+    """The settings file a backup command should use."""
+    config = getattr(args, "config", None)
+    return Path(config) if config else default_config_path()
+
+
+def _backup_outcome_exit(outcome: str) -> int:
+    return {
+        OUTCOME_COMPLETE: 0,
+        OUTCOME_PARTIAL: 1,
+        OUTCOME_FAILED: 1,
+        OUTCOME_REFUSED: 2,
+    }.get(outcome, 1)
+
+
+def _backup_status_exit(state: str) -> int:
+    return {
+        STATE_READY: 0,
+        STATE_NEVER_RUN: 1,
+        STATE_OVERDUE: 1,
+        STATE_TARGET_FULL: 1,
+        STATE_UNFINISHED: 1,
+        STATE_TARGET_MISSING: 2,
+        STATE_STORE_DAMAGED: 2,
+    }.get(state, 1)
+
+
+def _schedule_words(schedule: ScheduleSpec) -> str:
+    """A schedule in words: 'every day at 02:00', and the like."""
+    if schedule.every == "weekly":
+        weekday = (schedule.weekday or "monday").strip().lower().capitalize()
+        return f"every {weekday} at {schedule.at}"
+    return f"every day at {schedule.at}"
+
+
+def _retention_words(retention: RetentionSpec) -> str:
+    """A tidying rule in words, the way the owner chose it."""
+    if retention.mode == RETENTION_DAYS:
+        return f"keep backups for the last {retention.days} days"
+    return f"keep the newest {retention.count} backups"
+
+
+def _cmd_backup_setup(args) -> int:
+    config_path = _backup_config_path(args)
+    store_path = Path(args.store)
+    # The settings are built and checked first, before any store
+    # is created or opened and before anything is saved: a bad
+    # time, keeping rule, or spot-check interval refuses the whole
+    # setup up front and leaves nothing behind. Paths are saved in
+    # their full, resolved form, so the backup finds the same
+    # folders no matter where it is started from.
+    sources: list[str] = []
+    for source in getattr(args, "add") or []:
+        source_path = Path(source)
+        if not source_path.exists() and not source_path.is_symlink():
+            raise SourceNotFoundError(
+                f"'{source}' is not there, so it cannot be backed "
+                "up. Check the name, and that the drive it lives on "
+                "is plugged in, then set the backup up again."
+            )
+        sources.append(str(source_path.resolve()))
+    if getattr(args, "keep_count", None) is not None:
+        retention = RetentionSpec(
+            mode=RETENTION_COUNT, count=args.keep_count, days=30
+        )
+    elif getattr(args, "keep_days", None) is not None:
+        retention = RetentionSpec(
+            mode=RETENTION_DAYS, count=10, days=args.keep_days
+        )
+    else:
+        retention = RetentionSpec(mode=RETENTION_COUNT, count=10, days=30)
+    schedule = ScheduleSpec(
+        every=args.every, at=args.at, weekday=args.weekday
+    )
+    config = BackupConfig(
+        store=str(store_path.resolve()),
+        sources=sources,
+        schedule=schedule,
+        retention=retention,
+        verify_every_runs=args.verify_every,
+        created_utc=format_utc(utc_now()),
+        tool_version=__version__,
+    )
+    validate_config(config)
+    if not store_path.exists():
+        store = SnapshotStore.create(store_path)
+    elif (store_path / "store.json").exists():
+        store = SnapshotStore.open(store_path)
+    elif store_path.is_dir():
+        try:
+            is_empty = not any(store_path.iterdir())
+        except OSError:
+            is_empty = False
+        if is_empty:
+            store = SnapshotStore.create(store_path)
+        else:
+            raise StoreError(
+                f"'{store_path}' is not a Lazarus store, and it "
+                "already holds other files. Pick an empty folder "
+                "or a new folder for the backup store, so backups "
+                "never mix with other files."
+            )
+    else:
+        raise StoreError(
+            f"'{store_path}' is a file, not a folder. "
+            "Pick a folder for the backup store."
+        )
+    config.store = str(store.root)
+    save_config(config, config_path)
+    print("Backup is set up.")
+    print(f"Backup store: {config.store}")
+    print("What will be backed up:")
+    for source in config.sources:
+        print(f"  - {source}")
+    print(f"When: {_schedule_words(config.schedule)}")
+    print(f"Tidying rule: {_retention_words(config.retention)}")
+    print(
+        "Spot-check: the backup store will be checked every "
+        f"{config.verify_every_runs} runs."
+    )
+    print(f"Settings saved to: {config_path}")
+    print("Next step: Take the first backup now: lazarus backup run")
+    if args.register:
+        # Registration comes after the settings are saved and said
+        # so: on a computer that is not running Windows the
+        # registration raises BackupError, main() reports it and
+        # returns 2, and the saved-settings lines above are the
+        # honest record — the backup is set up; only the Windows
+        # task could not be registered here.
+        confirmation = register_schedule(
+            config, config_path, args.program or "lazarus"
+        )
+        print(confirmation)
+    return 0
+
+
+def _cmd_backup_run(args) -> int:
+    config_path = _backup_config_path(args)
+    config = load_config(config_path)
+    result = run_backup(config, config_path, trigger=TRIGGER_MANUAL)
+    print(result.to_text())
+    return _backup_outcome_exit(result.outcome)
+
+
+def _cmd_backup_due(args) -> int:
+    config_path = _backup_config_path(args)
+    config = load_config(config_path)
+    due_result = run_due_backup(config, config_path)
+    print(due_result.to_text())
+    if not due_result.due or due_result.result is None:
+        return 0
+    return _backup_outcome_exit(due_result.result.outcome)
+
+
+def _cmd_backup_status(args) -> int:
+    config_path = _backup_config_path(args)
+    config = load_config(config_path)
+    status = backup_status(config, config_path)
+    next_instant = next_scheduled_instant(
+        config.schedule, datetime.now().astimezone()
+    )
+    status.next_due_local = next_instant.strftime("%A %Y-%m-%d at %H:%M")
+    print(status.to_text())
+    return _backup_status_exit(status.state)
+
+
+def _cmd_backup_history(args) -> int:
+    config_path = _backup_config_path(args)
+    limit = getattr(args, "limit", None)
+    if limit is not None and limit < 1:
+        raise BackupError("The history limit must be at least 1.")
+    history = load_history(history_path_for(config_path))
+    if not history.entries:
+        print(
+            "No backups have run yet. Run 'lazarus backup run' "
+            "to take the first one."
+        )
+        return 0
+    if limit is None:
+        limit = 10
+    trigger_words = {
+        TRIGGER_MANUAL: "by hand",
+        TRIGGER_SCHEDULED: "scheduled",
+        TRIGGER_CATCHUP: "catch-up",
+    }
+    outcome_words = {
+        OUTCOME_COMPLETE: "complete",
+        OUTCOME_PARTIAL: "partial",
+        OUTCOME_FAILED: "failed",
+        OUTCOME_REFUSED: "refused",
+    }
+    blocks: list[str] = []
+    for entry in list(reversed(history.entries))[:limit]:
+        lines: list[str] = []
+        when = entry.started_utc if entry.started_utc else "unknown time"
+        lines.append(f"{when} — {outcome_words.get(entry.outcome, entry.outcome)}")
+        lines.append(
+            "  How it was started: "
+            f"{trigger_words.get(entry.trigger, entry.trigger)}"
+        )
+        lines.append(f"  Outcome: {outcome_words.get(entry.outcome, entry.outcome)}")
+        lines.append(
+            f"  Files saved: {entry.files_saved} "
+            f"({human_bytes(entry.bytes_saved)})"
+        )
+        lines.append(f"  Snapshots made: {len(entry.snapshots)}")
+        for snapshot_id in entry.snapshots:
+            lines.append(f"    - {snapshot_id}")
+        if entry.pruned:
+            lines.append(
+                f"  Old backups tidied away: {len(entry.pruned)}"
+            )
+        if entry.verified is not None:
+            if entry.verified:
+                lines.append(
+                    "  Spot-check: the backup store was checked "
+                    "before this run and everything verified."
+                )
+            else:
+                lines.append(
+                    "  Spot-check: checking the backup store found "
+                    f"{entry.verify_problems} problem(s)."
+                )
+        if entry.reason:
+            lines.append(f"  Reason: {entry.reason}")
+        for note in entry.notes:
+            lines.append(f"  Note: {note}")
+        blocks.append("\n".join(lines))
+    print("\n\n".join(blocks))
+    return 0
+
+
+def _cmd_backup_prune(args) -> int:
+    config_path = _backup_config_path(args)
+    config = load_config(config_path)
+    store_path = Path(config.store)
+    if not store_path.is_dir():
+        print(
+            "The backup drive is not connected: there is no folder "
+            f"at '{config.store}'. Plug the drive in and try again."
+        )
+        return 2
+    store = SnapshotStore.open(store_path)
+    history = load_history(history_path_for(config_path))
+    plan = plan_retention(
+        store, backup_snapshot_ids(history), config.retention, utc_now()
+    )
+    if not plan.remove:
+        print(
+            "Nothing to tidy up: every backup in the store is "
+            "inside the keeping rule you chose."
+        )
+    else:
+        print("These backups are outside the keeping rule you chose:")
+        for item in plan.remove:
+            when = item.created_utc if item.created_utc else "unknown date"
+            print(f"  - {item.id} (made {when}): {item.reason}")
+        print(f"Backups to remove: {len(plan.remove)}")
+    if plan.held:
+        print("Left alone:")
+        for held_id, reason in plan.held:
+            print(f"  - {held_id}: {reason}")
+    if not plan.remove:
+        return 0
+    if args.dry_run:
+        print("This was a dry run — nothing was removed.")
+        return 0
+    # A manual prune writes no history entry: history is the record
+    # of backup runs, and this prune reports itself here, on screen.
+    lock_path, stale_note = _acquire_run_lock(
+        store.root, new_snapshot_id(utc_now())
+    )
+    try:
+        if stale_note:
+            print(stale_note)
+        result = apply_retention(store, plan)
+    finally:
+        _release_run_lock(lock_path)
+    print(f"Removed {len(result.removed_ids)} old backup(s).")
+    print(f"Saved copies removed: {result.objects_removed}")
+    print(f"Space freed: {human_bytes(result.bytes_freed)}")
+    if result.gc_note:
+        print(result.gc_note)
+    return 0
+
+
+def _cmd_backup_register(args) -> int:
+    config_path = _backup_config_path(args)
+    config = load_config(config_path)
+    confirmation = register_schedule(
+        config, config_path, args.program or "lazarus"
+    )
+    print(confirmation)
+    return 0
+
+
+def _cmd_backup_unregister(args) -> int:
+    confirmation = unregister_schedule()
+    print(confirmation)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="lazarus",
@@ -412,6 +783,109 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("path")
     p.set_defaults(func=_cmd_assess)
+
+    p_backup = sub.add_parser(
+        "backup", help="scheduled backups into the snapshot store"
+    )
+    backup_sub = p_backup.add_subparsers(
+        dest="backup_command", required=True
+    )
+
+    bp = backup_sub.add_parser("setup", help="set a backup up")
+    bp.add_argument("--store", required=True, help="folder the backups live in")
+    bp.add_argument(
+        "--add", action="append", required=True,
+        help="a file or folder to back up (may be given more than once)",
+    )
+    bp.add_argument(
+        "--every", choices=["daily", "weekly"], default="daily",
+        help="how often backups run (default: daily)",
+    )
+    bp.add_argument(
+        "--weekday",
+        choices=[
+            "monday", "tuesday", "wednesday", "thursday",
+            "friday", "saturday", "sunday",
+        ],
+        default="monday",
+        help="the day for a weekly backup (default: monday)",
+    )
+    bp.add_argument(
+        "--at", default="02:00",
+        help="the local time backups run, like 02:00 (default: 02:00)",
+    )
+    keep = bp.add_mutually_exclusive_group()
+    keep.add_argument(
+        "--keep-count", type=int, default=None,
+        help="keep the newest this many backups",
+    )
+    keep.add_argument(
+        "--keep-days", type=int, default=None,
+        help="keep backups for the last this many days",
+    )
+    bp.add_argument(
+        "--verify-every", type=int, default=7, dest="verify_every",
+        help="spot-check the store every this many runs (default: 7)",
+    )
+    bp.add_argument(
+        "--register", action="store_true",
+        help="also register the schedule with Windows Task Scheduler",
+    )
+    bp.add_argument(
+        "--program", default="lazarus",
+        help="the program name the scheduled task runs (default: lazarus)",
+    )
+    bp.add_argument("--config", default=None, help="where the settings live")
+    bp.set_defaults(func=_cmd_backup_setup)
+
+    bp = backup_sub.add_parser("run", help="run a backup now")
+    bp.add_argument("--config", default=None, help="where the settings live")
+    bp.set_defaults(func=_cmd_backup_run)
+
+    bp = backup_sub.add_parser(
+        "due", help="run a backup only if the schedule says one is due"
+    )
+    bp.add_argument("--config", default=None, help="where the settings live")
+    bp.set_defaults(func=_cmd_backup_due)
+
+    bp = backup_sub.add_parser("status", help="say how the backup stands")
+    bp.add_argument("--config", default=None, help="where the settings live")
+    bp.set_defaults(func=_cmd_backup_status)
+
+    bp = backup_sub.add_parser("history", help="show past backup runs")
+    bp.add_argument("--config", default=None, help="where the settings live")
+    bp.add_argument(
+        "--limit", type=int, default=10,
+        help="how many runs to show (default: 10)",
+    )
+    bp.set_defaults(func=_cmd_backup_history)
+
+    bp = backup_sub.add_parser(
+        "prune", help="tidy away old backups outside the keeping rule"
+    )
+    bp.add_argument("--config", default=None, help="where the settings live")
+    bp.add_argument(
+        "--dry-run", action="store_true",
+        help="show what would be removed, and remove nothing",
+    )
+    bp.set_defaults(func=_cmd_backup_prune)
+
+    bp = backup_sub.add_parser(
+        "register", help="register the schedule with Windows Task Scheduler"
+    )
+    bp.add_argument("--config", default=None, help="where the settings live")
+    bp.add_argument(
+        "--program", default="lazarus",
+        help="the program name the scheduled task runs (default: lazarus)",
+    )
+    bp.set_defaults(func=_cmd_backup_register)
+
+    bp = backup_sub.add_parser(
+        "unregister",
+        help="remove the schedule from Windows Task Scheduler",
+    )
+    bp.add_argument("--config", default=None, help="where the settings live")
+    bp.set_defaults(func=_cmd_backup_unregister)
 
     return parser
 

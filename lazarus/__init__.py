@@ -27,15 +27,27 @@ signs to say which family it looks like (never "confirmed" —
 signs are not proof), and runs a published decryptor only on
 copies inside a work area it prepared, hashing the originals
 before and after so the report can say they never changed.
+
+Phase 4 is backup automation: the folders that matter, saved into
+the same versioned store on the owner's own schedule — by hand
+with one click, or by the computer's own scheduler when a backup
+comes due, with a missed moment owed exactly once as a catch-up.
+Status is loud and honest, said before trouble matters, and the
+tidying rule the owner chose is applied only after a run that
+finished cleanly — a bad day is never when history gets thrown
+out.
 """
 
 from ._version import __version__
 from .assess import assess_options
+from .backup import backup_status, load_config, run_backup
 from .decrypt_run import prepare_work_area, run_decryptor
 from .decryptors import identify_family, load_registry
 from .errors import LazarusError
 from .rescue import rescue_to_image
 from .restore import restore
+from .retention import apply_retention, plan_retention
+from .schedule import run_due_backup
 from .snapshot import create_snapshot
 from .store import SnapshotStore
 from .undelete import recover_deleted, scan_for_deleted
@@ -58,5 +70,11 @@ __all__ = [
     "prepare_work_area",
     "run_decryptor",
     "assess_options",
+    "run_backup",
+    "backup_status",
+    "load_config",
+    "plan_retention",
+    "apply_retention",
+    "run_due_backup",
     "__version__",
 ]

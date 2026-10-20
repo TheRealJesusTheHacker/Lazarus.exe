@@ -2,6 +2,103 @@
 
 All notable changes to LAZARUS.EXE are recorded here, newest first.
 
+## [0.5.0] — 2026-10-20
+
+Phase 4 — backup automation: the versioned store, made automatic.
+
+### Added
+
+- **One-click backup** — `lazarus backup setup` records, in a
+  plain configuration file, which folders matter, where the
+  backup store lives, and how many restore points to keep;
+  `lazarus backup run` then snapshots every configured folder
+  into the Phase 1 versioned store in one step. Each run is a
+  new dated restore point, restorable with the Phase 1 engine
+  exactly like any other snapshot. Setup checks every answer
+  before anything is saved — a backup time that is not a time,
+  or a keep-count of zero, is refused up front in plain language
+  instead of failing later. Folder and store paths are saved in
+  full, never as shortcuts relative to wherever the command
+  happened to run, so a scheduled run backs up the folders that
+  were chosen — not a same-named folder somewhere else.
+- **Scheduled backup with honest catch-up** — a daily or weekly
+  schedule, the owner's choice. `lazarus backup due` is the
+  entry point the system scheduler calls: it works out what was
+  due, runs at most one catch-up backup, and the history names
+  the trigger honestly — *scheduled* when it ran on time,
+  *catch-up* when the computer was off and it ran late. A
+  backup that already covered a scheduled time never runs
+  twice for it. Registration with Windows Task Scheduler is
+  built as tested `schtasks` commands behind a platform seam —
+  the commands are proven here; registering them for real
+  happens on a Windows machine.
+- **Loud target status, before disaster** — `lazarus backup
+  status` answers in one of a few plain states: READY, TARGET
+  MISSING (the backup drive is not there), TARGET FULL (with
+  the free space and the estimated need, both as numbers),
+  STORE DAMAGED (with what to do next), NEVER RUN, OVERDUE, and
+  — when an earlier backup was cut off mid-save — a state that
+  says exactly that and names the one command that clears it.
+  Every run pre-flights the same checks before copying a byte:
+  target present, store reachable and writable, enough room for
+  an honest estimate (based on what the last run actually
+  copied, and labelled an estimate), and a spot-check of the
+  store's integrity on a regular cadence — the same "is a check
+  due" rule drives both running and status, so status can never
+  say READY on a day a run would have caught damage. A forged
+  or clock-skewed history entry dated in the future cannot
+  suppress those checks.
+- **A run history that survives restarts** — every attempt is
+  recorded: when it started, what triggered it (manual,
+  scheduled, catch-up), the outcome, which snapshots were made,
+  how many bytes were copied, how long it took, and — on
+  failure — the plain reason. Refused runs are recorded too;
+  there are no silent gaps. Damaged lines in the history file
+  are counted and skipped, never trusted and never fatal.
+- **Retention that cannot remove the wrong backup** —
+  keep-how-many or keep-how-long, applied only after a fully
+  successful run, never during or after a failed one, and
+  reported exactly: what was removed, what was left alone, and
+  why. The newest backup is never removed. Safety copies taken
+  before a restore are never retention candidates. A backup
+  whose date cannot be read is left alone, always — Lazarus
+  never removes a backup it cannot date. Copies shared between
+  snapshots are kept while any snapshot still needs them, and
+  brand-new copies are given a day's grace before any tidy-up
+  may sweep them, so a snapshot still being written can never
+  be tidied out from under itself. `lazarus backup prune`
+  previews the exact plan as a dry run before anything is
+  removed, and the same command clears away the leftovers of a
+  backup that never finished saving, once they are a day old.
+- **One backup at a time** — a run lock makes a second backup
+  started while one is already running refuse plainly, naming
+  the lock file and how to clear it if no backup is actually
+  running. Overlapping scheduled and manual runs were proven to
+  produce exactly one backup, one refusal, and an intact store.
+
+### Notes
+
+- The suite stands at 411 tests passing (2 skipped) — 408 from
+  Phase 4's own work, plus 3 from a fleet-wide rescue fix that
+  landed on main while this phase was in build. Phase 4
+  went through an independent adversarial audit — 16 findings,
+  including a sweep that could follow a shortcut folder out of
+  the store, relative paths that could back up the wrong folder
+  from a scheduled task's working directory, and a damaged
+  snapshot record that could blind the integrity check. Every
+  code-fixable finding was fixed and pinned by a permanent
+  test; the few accepted residuals (for example, a lock held by
+  a recycled process number fails safe and says how to clear
+  it) are recorded in the roadmap's Phase 4 as-built note.
+  The test suite itself caught one real bug before the audit:
+  the integrity spot-check cadence was off by one, and a failed
+  check could stop future checks from running.
+- Windows Task Scheduler registration is seam-only until a
+  Windows-hardware run: the commands are built and tested, but
+  no real task has been registered yet, and nothing here claims
+  otherwise. The full Windows verification list is in the
+  roadmap's Phase 4 note.
+
 ## [0.4.0] — 2026-10-20
 
 Phase 3 — decrypt & unlock files off drives.

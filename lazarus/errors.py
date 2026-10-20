@@ -77,3 +77,15 @@ class DecryptorError(LazarusError):
 
 class DecryptorRefusedError(LazarusError):
     """A safety rule stopped a decryptor run before anything ran."""
+
+
+class BackupError(LazarusError):
+    """A backup could not be set up, checked, or run."""
+
+
+class BackupConfigError(BackupError):
+    """The backup settings file is missing, damaged, or unusable."""
+
+
+class BackupRefusedError(BackupError):
+    """A safety rule stopped a backup before it wrote anything."""
