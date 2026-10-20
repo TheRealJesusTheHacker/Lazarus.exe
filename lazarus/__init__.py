@@ -36,6 +36,12 @@ Status is loud and honest, said before trouble matters, and the
 tidying rule the owner chose is applied only after a run that
 finished cleanly — a bad day is never when history gets thrown
 out.
+
+Phase 5 is the window and the wrapping: an animated PySide6
+interface over the whole engine — restore leading, odds and
+status as first-class screens — the self-installing one-file
+Lazarus.exe, and the portable no-install edition, shipped
+together as the first public release.
 """
 
 from ._version import __version__

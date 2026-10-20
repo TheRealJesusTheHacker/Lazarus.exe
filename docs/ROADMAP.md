@@ -360,7 +360,77 @@ large real store; and the full suite re-run on Windows.
 - Every failure state a designed screen with one clear next action,
   in plain language.
 
-**Status: PLANNED.**
+**Status: COMPLETE — v1.0.0, the first public release.**
+
+As built: the window is a PySide6 interface in Sentinel green on
+black — five pages (Restore, Snapshots, Deleted files, Locked
+files, Backup) over a Qt-free controller, so every control calls
+the real Phase 1–4 engine and the core suite runs with no Qt
+loaded. Restore leads, as planned; the odds and the backup status
+are first-class screens. Long jobs run on one guarded worker with
+real progress (byte counters and the rescue progress map polled
+live — never invented percentages); quitting mid-job waits for
+the job to finish rather than tearing it down. Twenty-one
+interface states were rendered and eyeballed, and every
+text/background pairing was computed and verified on the renders
+at 4.5:1 or better. The render review itself caught a real defect
+— dialog text squeezed past its label under offscreen size hints —
+fixed by sizing dialogs to their contents and pinned with a test.
+Packaging is the medic-kit pattern: one self-installing
+Lazarus.exe (Program Files copy + Start Menu entry, one approval
+prompt, every step verified and reported; removing it is one
+click in a portable copy), LazarusPortable.zip alongside it, and
+a tag-gated release workflow that runs the whole suite on
+Windows, launches the staged program's self-check, and publishes
+with SHA256SUMS.txt. An independent audit of the new surface (56
+attack probes) found 16 items, five of them serious; all were
+fixed and regression-pinned, and the re-audit caught one more
+serious item the first pass missed — a shortcut (symlink)
+pointing at a pipe slipped past the pipe check — which was
+fixed and pinned the same way. A final re-audit verified every
+fix and found no regressions; the release proof build then
+caught one last interaction — the packaged program's start-up
+self-check waiting on the mid-job close dialog — which was
+fixed, pinned, and proven on a rebuilt packaged program before
+release.
+
+Three honest residuals, recorded rather than hidden: (1) pointing
+the window at a pipe or socket as a scan/rescue/snapshot source
+— including through a shortcut that points at one — is refused
+by the window up front in plain language, but the
+command line can still be made to wait on one — the engine-level
+refusal is future engine work, not claimed here. (2) The backup
+status's "what to do next" line for a damaged store still names
+the command-line check, because the window shows the engine's
+own words verbatim; wording parity there is future engine-copy
+work. (3) A rescue destination that is a shortcut loop (a
+symlink pointing at itself) reaches the engine's general apology
+rather than a specific message — a pre-existing engine
+disposition, recorded for a future engine pass; nothing hangs
+and nothing is written.
+
+**Seam-only until a Windows-hardware run** (nothing here claims
+otherwise — the release workflow's Windows run of the suite
+proves the suite on Windows, not these): the first interactive
+run of the window on a real display, including display scaling,
+with each flow started for real; self-install end to end — the
+offer, the approval prompt, the Program Files copy and Start
+Menu entry verified on disk, the installed copy launched, and
+removal from a portable copy; the portable edition run from a
+real USB drive; manage-bde accepting an owner's recovery key on
+a real locked volume (Phase 3); `schtasks` accepting the built
+registration commands on a real machine, the registered task
+firing `lazarus backup due` from the Task Scheduler working
+folder and hitting the configured folders, a missed run catching
+up after the machine was off, local-time/DST behavior around a
+schedule boundary, the backup commands as a standard user, the
+stored command line with spaces in the program and config
+paths, and status spot-check timing against a large real store
+(Phase 4); and, from Phases 1–2, locked-file restore wording on
+a real restore, paths longer than 260 characters, multi-GB and
+disk-full restores, cross-volume restore, a power cut
+mid-restore on NTFS, Unicode filenames, and real deleted files
+on real NTFS volumes and a real failing drive.
 
 ## Later / backlog
 

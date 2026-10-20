@@ -2,7 +2,7 @@
 
 **Sentinel Safeguard LLC — backup, restore, and file recovery for Windows.**
 
-[![Version](https://img.shields.io/badge/version-v0.5.0-2ee06f?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
+[![Version](https://img.shields.io/badge/version-v1.0.0-2ee06f?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/TheRealJesusTheHacker/Lazarus.exe)
 [![Python](https://img.shields.io/badge/Python-3-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Proprietary-b03a2e?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/LICENSE)
@@ -97,35 +97,44 @@ language, no corners cut, nothing promised that isn't delivered.
 
 ## Status
 
-**v0.5.0 — Phase 4 complete: backup automation.** The Phase 1
-snapshot store now runs itself. `lazarus backup setup` saves, in
-plain language, which folders matter and where the backup drive
-is; `lazarus backup run` takes a dated restore point of all of
-them in one step. Backups can run on a daily or weekly schedule
-— if the computer was off at the scheduled time, the next start
-catches up and the history says so; there are no silent gaps.
-`lazarus backup status` is loud before disaster, not after:
-READY, TARGET MISSING, TARGET FULL (with the numbers), STORE
-DAMAGED (with what to do next), NEVER RUN, or OVERDUE — checked
-before every run, with the backup drive's free space compared
-against an honest estimate and the store itself spot-checked for
-damage on a regular cadence. Every attempt, success or failure,
-is written to a run history that survives restarts. Old restore
-points are tidied by a keep-how-many / keep-how-long rule that
-never touches the newest backup, never runs after a failed
-backup, and can be previewed before anything is removed.
-Registration with Windows Task Scheduler is built and tested
-through a platform seam; the registration itself is proven on a
-Windows machine, not claimed before then — the roadmap's
-Phase 4 note says exactly which parts those are. Phases 1–3
-stand as shipped: the snapshot store and restore engine,
-undelete with honest odds and rescue cloning, and owner-key
-unlock with the published-decryptor list. It all runs today
-from the command line; the animated interface arrives in
-Phase 5 — see the [roadmap](docs/ROADMAP.md) and the
-[changelog](CHANGELOG.md).
+**v1.0.0 — the first public release. Phases 1–5 complete.**
+Everything the command line could do, the Lazarus window now
+does, in five pages. **Restore** leads: pick a snapshot by date,
+browse what it holds, choose a file, a folder, or everything,
+and put it back where it lived or somewhere new — the engine
+takes its safety copy first and ends with a plain-language
+report of exactly what came back. **Snapshots** takes a new
+dated restore point and can verify the whole store byte for
+byte. **Deleted files** scans a drive or an image and shows the
+honest odds beside every file before anything is recovered —
+recovery always lands on a different drive — and a failing
+drive can be rescued to an image with its progress map live on
+screen, safe to stop and resume. **Locked files** opens a
+BitLocker volume with your own recovery key (asked once, tried
+once, never kept) and, for folders locked by ransomware, says
+which known family it looks like, runs that family's published
+decryptor on copies only, and gives a one-screen honest
+assessment. **Backup** opens on the loud status — READY, TARGET
+MISSING, TARGET FULL, STORE DAMAGED, NEVER RUN, OVERDUE, or
+UNFINISHED, with the numbers and what to do — then setup, run
+now, history, and the tidying rule with its preview. The
+command line remains, unchanged.
 
-A portable no-install edition (folder/USB, Argus Portable pattern) is a named Phase 5 deliverable and will ship alongside the installer — see the roadmap.
+Downloads, on the releases page: **Lazarus.exe** — one file;
+run it and it offers, once, to install itself (a copy in
+Program Files and a Start Menu entry, behind one Windows
+approval prompt, every step verified and reported); saying no
+costs nothing. **LazarusPortable.zip** — the same program with
+no install at all, for a folder or a USB drive.
+**SHA256SUMS.txt** covers both downloads.
+
+What is still proven only through its test seams until a real
+Windows run — Task Scheduler registration firing on a real
+machine, manage-bde accepting a key, the installer end to
+end, the first interactive run of the window — is listed in
+full in the [roadmap](docs/ROADMAP.md), and nothing here
+claims it early. See the [changelog](CHANGELOG.md) for what
+each phase added.
 
 ## License
 

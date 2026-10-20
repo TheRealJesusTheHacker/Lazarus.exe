@@ -2,7 +2,41 @@
 
 All notable changes to LAZARUS.EXE are recorded here, newest first.
 
-## [Unreleased]
+## [1.0.0] — 2026-10-20
+
+Phase 5 — the animated interface, packaging, and the first public
+release of LAZARUS.EXE.
+
+### Added
+
+- **The Lazarus window** — a PySide6 interface, green on black,
+  over the whole Phase 1–4 engine; every control works, nothing
+  is decoration. Five pages: **Restore** (the flagship — pick a
+  snapshot by date, browse what it holds, choose a file, a
+  folder, or everything, and restore it to where it lived or
+  somewhere new, with the engine's safety copy taken first and
+  the plain-language report at the end); **Snapshots** (take one,
+  label it, verify the store byte for byte); **Deleted files**
+  (scan a drive or image with the honest odds beside every file,
+  bring back the ones you choose onto a different drive, and
+  rescue a failing drive to an image with the resumable progress
+  map live on screen); **Locked files** (open a BitLocker volume
+  with your own recovery key — asked once, tried once, never
+  kept; identify which known ransomware family locked a folder,
+  run its published decryptor on copies only, and read the
+  one-screen honest assessment); **Backup** (the loud status
+  first, then set up, run now, history, and the tidying rule with
+  its preview).
+- **Self-installing Lazarus.exe** — the shipped one-file program
+  offers, once, to install itself: a copy in Program Files and a
+  Start Menu entry, behind one Windows approval prompt, each step
+  verified and reported in plain language. Saying no costs
+  nothing — the copy you ran keeps working. Removing the
+  installed copy is one click in a portable copy's window, or
+  `--lazarus-uninstall`.
+- **Lazarus Portable** — LazarusPortable.zip: the same program as
+  a no-install edition that runs from a folder or USB drive.
+- **Release checksums** — SHA256SUMS.txt covers both downloads.
 
 ### Fixed
 
@@ -14,6 +48,31 @@ All notable changes to LAZARUS.EXE are recorded here, newest first.
   text-mode audit (2026-10-20); regression tests model the Windows
   runtime and drive a real rescue end to end
   (`tests/test_rescue_binary_mode.py`).
+
+### Notes
+
+- 544 passed, 2 skipped in the full suite, including 133 tests
+  added for the interface, the installer, and the audit fixes;
+  the suite also runs on Windows in the release workflow before
+  anything is published.
+- Audit: an independent adversarial pass over the new surface
+  found 16 items (5 of them serious — a stale decrypt-family
+  picker, a prune that could outrun its own preview, quitting
+  mid-job, a pipe source that could hang a scan, and a multi-root
+  restore report that could understate what came back). Every
+  one was fixed and pinned with a regression test; the re-audit
+  then caught one more serious item the first pass had missed (a
+  shortcut pointing at a pipe slipped past the pipe check), which
+  was fixed and pinned the same way. A final re-audit verified
+  those fixes and found no regressions — and the release proof
+  build then caught one last interaction (the packaged program's
+  start-up self-check could wait forever on a close-confirmation
+  dialog nobody could see), which was fixed, pinned, and proven
+  on a rebuilt packaged program before release.
+- Still seam-only until a real Windows run: Task Scheduler
+  registration firing, manage-bde accepting a key, the installer
+  and the window on a real machine — the full list is in the
+  roadmap, and nothing here claims it early.
 
 ## [0.5.0] — 2026-10-20
 
