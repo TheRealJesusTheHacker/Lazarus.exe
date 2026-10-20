@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# PyInstaller
+build/
+dist/
+*.manifest
+
+# Lazarus working data (never commit snapshot stores, disk images, or recovered files)
+*.log
+stores/
+images/
+recovered/
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
