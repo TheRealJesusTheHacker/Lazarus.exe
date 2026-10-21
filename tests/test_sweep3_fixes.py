@@ -46,6 +46,7 @@ from lazarus.errors import (
     RestoreRefusedError,
     SourceError,
     SourceNotFoundError,
+    StoreError,
 )
 from lazarus.hashing import hash_bytes
 from lazarus.recovery_model import DeletedFile, Extent
@@ -80,6 +81,8 @@ def test_pipe_source_is_refused_before_it_can_block(tmp_path):
 
 
 def test_socket_source_is_refused_before_open(tmp_path):
+    if not hasattr(socket, "AF_UNIX"):
+        pytest.skip("this Python has no filesystem sockets (AF_UNIX)")
     sock_path = tmp_path / "a-socket"
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
@@ -125,13 +128,25 @@ def _make_loop(tmp_path: Path) -> Path:
     return loop
 
 
+# The cross-platform contract for a looping destination is a
+# DESIGNED refusal before anything is written — never a raw
+# RuntimeError, never a traceback. Where the platform's path
+# resolver reports the loop (POSIX does; Windows' does not, for
+# a loop in a parent folder), the refusal names the loop
+# itself; on Windows the refusal lands one designed check
+# later, in that check's own plain words (the folder cannot be
+# created there; the folder is on the same drive). Both shapes
+# are pinned for what they are.
+
+
 def test_rescue_into_a_shortcut_loop_is_a_plain_refusal(tmp_path):
     source = tmp_path / "drive.img"
     source.write_bytes(b"\x00" * 8192)
     loop = _make_loop(tmp_path)
     with pytest.raises(RescueError) as caught:
         rescue_to_image(source, loop / "image.img")
-    assert "points back on itself" in str(caught.value)
+    if os.name != "nt":
+        assert "points back on itself" in str(caught.value)
 
 
 def test_recover_into_a_shortcut_loop_is_a_plain_refusal(tmp_path):
@@ -140,7 +155,8 @@ def test_recover_into_a_shortcut_loop_is_a_plain_refusal(tmp_path):
     loop = _make_loop(tmp_path)
     with pytest.raises(RecoveryRefusedError) as caught:
         recover_deleted(source, loop / "out")
-    assert "points back on itself" in str(caught.value)
+    if os.name != "nt":
+        assert "points back on itself" in str(caught.value)
 
 
 def test_snapshot_of_a_shortcut_loop_is_a_plain_refusal(tmp_path):
@@ -154,9 +170,15 @@ def test_snapshot_of_a_shortcut_loop_is_a_plain_refusal(tmp_path):
 def test_restore_into_a_shortcut_loop_is_a_plain_refusal(tmp_path):
     store = SimpleNamespace(root=tmp_path / "store")
     loop = _make_loop(tmp_path)
-    with pytest.raises(RestoreRefusedError) as caught:
+    # On Windows the resolver stays silent about a parent-folder
+    # loop, so the refusal arrives as the destination check's own
+    # "could not use" StoreError instead — still designed, still
+    # plain, still before anything is written.
+    with pytest.raises((RestoreRefusedError, StoreError)) as caught:
         _check_destination(store, loop / "out")
-    assert "points back on itself" in str(caught.value)
+    if os.name != "nt":
+        assert isinstance(caught.value, RestoreRefusedError)
+        assert "points back on itself" in str(caught.value)
 
 
 # ---------------------------------------------------------------------

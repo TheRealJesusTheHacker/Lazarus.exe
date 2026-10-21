@@ -33,8 +33,12 @@ and five more findings from the sweep are fixed alongside.
   with `Path.resolve()`, which raises a raw `RuntimeError` on
   a loop: the command line died with a traceback and the
   window could only apologise. Each now refuses in plain
-  words naming the looping path. (This closes the Phase 5
-  audit's third recorded residual.)
+  words instead: where the platform's resolver reports the
+  loop, the refusal names it; where it stays silent (a loop
+  in a parent folder, on Windows), the refusal still lands
+  one designed check later, in that check's own words, before
+  anything is written. (This closes the Phase 5 audit's third
+  recorded residual.)
 - **Recovery streams instead of loading whole files into
   memory.** A deleted file is now written a chunk at a time
   and hashed as it lands; before, recovering a file larger
