@@ -528,12 +528,12 @@ def perform_install(
             (
                 "Check the copy",
                 False,
-                "The copy in the install folder does not match "
-                "the program you ran, so it should not be used. "
-                "Run Lazarus again and accept the install offer — "
-                "it will be offered again precisely because this "
-                "copy is not whole — or copy Lazarus.exe there "
-                "by hand.",
+                "The copy in the install folder is not the same "
+                "size as the program you ran, so it should not be "
+                "used. Run Lazarus again and accept the install "
+                "offer — it will be offered again precisely "
+                "because this copy is not whole — or copy "
+                "Lazarus.exe there by hand.",
             )
         )
         return report
@@ -541,8 +541,8 @@ def perform_install(
         (
             "Check the copy",
             True,
-            "The installed copy matches the program you ran, "
-            "byte for byte in size.",
+            "The installed copy is the same size as the program "
+            "you ran.",
         )
     )
 

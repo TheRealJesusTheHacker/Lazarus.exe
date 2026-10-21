@@ -583,10 +583,16 @@ def estimate_backup_bytes(
     number is never presented as more certain than it is.
     """
     current_total = _source_total_bytes(config.sources)
+    # The same future-dating rule every other derivation here
+    # follows: an entry claiming to be from well in the future
+    # has not happened yet, so what it copied cannot be the
+    # guide for the next run's size.
+    moment = utc_now()
     productive = [
         entry
         for entry in history.entries
         if entry.outcome in (OUTCOME_COMPLETE, OUTCOME_PARTIAL)
+        and not _entry_is_future_dated(entry, moment)
     ]
     if productive:
         estimate = productive[-1].bytes_copied
@@ -792,7 +798,27 @@ def run_backup(
             reason=reason,
             notes=list(notes) + list(extra_notes or []),
         )
-        append_history(history_file, entry)
+        try:
+            append_history(history_file, entry)
+        except BackupError:
+            # The run's own truth stands: a backup that finished
+            # is finished even when its history line cannot be
+            # written, and a refusal is still a refusal. Raising
+            # here would report the run as a crash over the top
+            # of its real outcome — so the failure is carried in
+            # the result instead, said out loud in both the entry
+            # and the message, never swallowed silently.
+            entry.notes.append(
+                "This run's place in the backup history could "
+                f"not be written to '{history_file}'. The run "
+                "itself stands as reported; the next status check "
+                "may not know it happened."
+            )
+            message = (
+                f"{message} One more thing: this run could not "
+                "be written into the backup history — the run "
+                "itself stands as reported."
+            )
         return RunResult(
             config_path=str(config_path),
             outcome=outcome,
@@ -1126,8 +1152,10 @@ def backup_status(
             STATE_STORE_DAMAGED,
             "The backup store is damaged.",
             str(error),
-            f"Run 'lazarus verify {config.store}' to see what is "
-            "damaged, and check the backup drive.",
+            "See what is damaged: in the window, open the store "
+            "on the Restore page and choose 'Verify this store'; "
+            f"on the command line, run 'lazarus verify "
+            f"{config.store}'. Also check the backup drive.",
         )
     snapshots_in_store = len(
         [info for info in store.list_snapshots() if info.has_manifest]
@@ -1150,10 +1178,12 @@ def backup_status(
                     "one of them is a backup that never finished "
                     "saving. What it left behind is in the way, "
                     "but the finished backups are not damaged.",
-                    "The leftover is cleared by 'lazarus backup "
-                    "prune' once it is more than a day old; if it "
-                    "is newer, a backup may still be writing — "
-                    "wait and try again.",
+                    "The leftover is cleared by tidying (the "
+                    "Backup page's 'Tidy them away', or 'lazarus "
+                    "backup prune' on the command line) once it "
+                    "is more than a day old; if it is newer, a "
+                    "backup may still be writing — wait and try "
+                    "again.",
                     snapshots_in_store=snapshots_in_store,
                     free_bytes=free,
                     estimate_bytes=estimate,
@@ -1164,8 +1194,11 @@ def backup_status(
                 f"A spot-check of the store found "
                 f"{len(check.problems)} problem(s). Backups should "
                 "not add to a store that cannot prove what it holds.",
-                f"Run 'lazarus verify {config.store}' to see what "
-                "is damaged, and check the backup drive.",
+                "See what is damaged: in the window, open the "
+                "store on the Restore page and choose 'Verify "
+                "this store'; on the command line, run 'lazarus "
+                f"verify {config.store}'. Also check the backup "
+                "drive.",
                 snapshots_in_store=snapshots_in_store,
                 free_bytes=free,
                 estimate_bytes=estimate,

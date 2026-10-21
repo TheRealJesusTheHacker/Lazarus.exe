@@ -24,6 +24,7 @@ before it writes a byte.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,7 +32,6 @@ from typing import Optional
 
 from . import filesystems
 from .errors import RecoveryRefusedError, UndeleteError
-from .hashing import hash_bytes
 from .recovery_model import DeletedFile, FsScan
 from .source import BlockReader, ReadOnlySource, device_id_of
 
@@ -439,6 +439,24 @@ def _safe_output_name(raw: str, taken: set[str]) -> str:
     return candidate
 
 
+def _resolved(path: Path) -> Path:
+    """``path`` with every shortcut followed — or a plain refusal.
+
+    A shortcut that loops back on itself can never be followed
+    to a real place, and ``Path.resolve()`` raises
+    ``RuntimeError`` for one: a raw crash, not a designed
+    answer. The refusal names the path and what is wrong.
+    """
+    try:
+        return Path(path).resolve()
+    except (RuntimeError, OSError) as error:
+        raise RecoveryRefusedError(
+            f"'{path}' cannot be followed to a real place: it "
+            "points back on itself (a shortcut that loops), or "
+            "sits inside one. Pick a different folder."
+        ) from error
+
+
 def _destination_device(destination: Path, source_device: int) -> int:
     """The device the destination writes would land on — checking
     the folder itself, or the nearest folder above it that exists."""
@@ -460,48 +478,86 @@ def _read_extent(reader: BlockReader, start: int, length: int) -> bytes:
         return b""
 
 
+#: Recovered files are written a piece at a time, never held
+#: whole in memory: a deleted video or disk image can be larger
+#: than the memory of the machine recovering it, and a recovery
+#: tool must not fall over on exactly the files it exists for.
+_RECOVERY_CHUNK = 1024 * 1024
+
+
 def _recover_one(reader: BlockReader, assessment: FileAssessment, out_path: Path) -> RecoveryItem:
     candidate = assessment.candidate
     size = candidate.size
-    written = bytearray()
     missing = 0
-
-    if candidate.resident_data is not None:
-        data = candidate.resident_data[:size]
-        missing += size - len(data)
-        written.extend(data)
-        written.extend(b"\x00" * (size - len(written)))
-    else:
-        accounted = 0
-        for extent in candidate.extents:
-            if accounted >= size:
-                break
-            take = min(extent.length, size - accounted)
-            if take <= 0:
-                continue
-            accounted += take
-            if extent.start == -1:
-                # Never stored on the drive: zeros are its true
-                # contents, exactly as assess() weighed them.
-                written.extend(b"\x00" * take)
-                continue
-            if extent.in_use is True:
-                missing += take
-                written.extend(b"\x00" * take)
-                continue
-            data = _read_extent(reader, extent.start, take)
-            if len(data) < take:
-                missing += take - len(data)
-                data = data + b"\x00" * (take - len(data))
-            written.extend(data)
-        if accounted < size:
-            missing += size - accounted
-            written.extend(b"\x00" * (size - accounted))
+    written_total = 0
+    digest = hashlib.sha256()
 
     try:
         with open(out_path, "wb") as handle:
-            handle.write(bytes(written))
+
+            def emit(data: bytes) -> None:
+                nonlocal written_total
+                if data:
+                    handle.write(data)
+                    digest.update(data)
+                    written_total += len(data)
+
+            def emit_zeros(count: int) -> None:
+                block = b"\x00" * min(count, _RECOVERY_CHUNK)
+                remaining = count
+                while remaining > 0:
+                    piece = block[:remaining] if remaining < len(block) else block
+                    emit(piece)
+                    remaining -= len(piece)
+
+            if candidate.resident_data is not None:
+                data = candidate.resident_data[:size]
+                missing += size - len(data)
+                emit(data)
+                emit_zeros(size - written_total)
+            else:
+                accounted = 0
+                for extent in candidate.extents:
+                    if accounted >= size:
+                        break
+                    take = min(extent.length, size - accounted)
+                    if take <= 0:
+                        continue
+                    accounted += take
+                    if extent.start == -1:
+                        # Never stored on the drive: zeros are its
+                        # true contents, exactly as assess() weighed
+                        # them.
+                        emit_zeros(take)
+                        continue
+                    if extent.in_use is True:
+                        missing += take
+                        emit_zeros(take)
+                        continue
+                    offset = extent.start
+                    remaining = take
+                    while remaining > 0:
+                        step = min(_RECOVERY_CHUNK, remaining)
+                        data = _read_extent(reader, offset, step)[:step]
+                        if len(data) < step:
+                            missing += step - len(data)
+                            emit(data)
+                            emit_zeros(step - len(data))
+                        else:
+                            emit(data)
+                        offset += step
+                        remaining -= step
+                if accounted < size:
+                    missing += size - accounted
+                    emit_zeros(size - accounted)
     except OSError as error:
+        # A copy that could not be written whole is not left
+        # behind under the recovered name: a truncated file
+        # wearing the name would read as the file, only shorter.
+        try:
+            out_path.unlink()
+        except OSError:
+            pass
         return RecoveryItem(
             name=assessment.name,
             verdict=assessment.verdict,
@@ -515,9 +571,9 @@ def _recover_one(reader: BlockReader, assessment: FileAssessment, out_path: Path
         verdict=assessment.verdict,
         outcome=outcome,
         written_to=out_path.name,
-        bytes_written=len(written),
+        bytes_written=written_total,
         missing_bytes=missing,
-        sha256=hash_bytes(bytes(written)),
+        sha256=digest.hexdigest(),
         message="" if missing == 0 else assessment.summary,
     )
 
@@ -539,7 +595,7 @@ def recover_deleted(source, destination, names=None) -> RecoveryReport:
     try:
         if isinstance(source, (str, Path)):
             source_device = reader.device_id
-            if destination.resolve() == Path(source).resolve():
+            if _resolved(destination) == _resolved(Path(source)):
                 raise RecoveryRefusedError(
                     "That destination is the source itself. Recovered "
                     "files are always written somewhere else — writing "

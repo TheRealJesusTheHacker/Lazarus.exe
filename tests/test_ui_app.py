@@ -1169,3 +1169,21 @@ def test_failure_during_close_grace_stays_open_to_be_read(
     window.close()
     qapp.processEvents()
     assert not window.isVisible()
+
+
+def test_worker_drops_its_callable_after_running(qapp):
+    """Sweep #3: a finished worker must not keep its callable —
+    and whatever the callable closed over — alive. The unlock
+    job's callable closes over the owner's recovery key; the
+    worker stays a child of the window after the job, so the
+    closure must not stay with it."""
+    from lazarus.ui.app import Worker
+
+    seen = {}
+    worker = Worker(lambda: "done")
+    worker.succeeded.connect(lambda result: seen.update(result=result))
+    worker.start()
+    assert worker.wait(10000)
+    qapp.processEvents()
+    assert seen.get("result") == "done"
+    assert worker._fn is None

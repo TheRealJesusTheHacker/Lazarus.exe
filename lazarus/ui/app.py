@@ -80,12 +80,23 @@ if _QT_ERROR is None:
             self._fn = fn
 
         def run(self) -> None:
+            # Take the callable, then drop the worker's own
+            # reference to it before running. A finished worker
+            # stays a child of the window for the window's whole
+            # life, and one job's callable closes over the owner's
+            # recovery key (the unlock job's key provider): the
+            # engine drops the key the moment the attempt ends,
+            # and the key must not outlive it here either, kept
+            # reachable by a worker nobody looks at again.
+            fn, self._fn = self._fn, None
             try:
-                self.succeeded.emit(self._fn())
+                result = fn()
             except LazarusError as error:
                 self.failed.emit(str(error))
             except Exception:  # the window never shows a traceback
                 self.failed.emit(APOLOGY)
+            else:
+                self.succeeded.emit(result)
 
     class MessagePanel(QFrame):
         """The one designed place good news and problems are said."""

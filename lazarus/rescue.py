@@ -53,6 +53,25 @@ def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def _resolved(path: Path) -> Path:
+    """``path`` with every shortcut followed — or a plain refusal.
+
+    Following a shortcut that loops back on itself never
+    arrives: ``Path.resolve()`` raises ``RuntimeError`` for one,
+    and a raw crash is not a designed answer — the command line
+    died with a traceback and the window could only apologise.
+    The refusal names the path and what is wrong with it.
+    """
+    try:
+        return Path(path).resolve()
+    except (RuntimeError, OSError) as error:
+        raise RescueError(
+            f"'{path}' cannot be followed to a real place: it "
+            "points back on itself (a shortcut that loops), or "
+            "sits inside one. Pick a different place."
+        ) from error
+
+
 def _expected_region_count(source_size: int, block_size: int) -> int:
     if source_size <= 0:
         return 0
@@ -522,7 +541,7 @@ def rescue_to_image(
     source_path: Path | None = None
     if isinstance(source, (str, Path)):
         source_path = Path(source)
-        if destination_path.resolve() == source_path.resolve():
+        if _resolved(destination_path) == _resolved(source_path):
             raise RescueError(
                 "The image would be written over the drive it is meant "
                 f"to rescue: '{source_path}' is both the source and the "
@@ -531,14 +550,14 @@ def rescue_to_image(
     elif isinstance(source, ReadOnlySource):
         source_path = source.path
 
-    if source_path is not None and destination_path.resolve() == source_path.resolve():
+    if source_path is not None and _resolved(destination_path) == _resolved(source_path):
         raise RescueError(
             "The image would be written over the drive it is meant "
             f"to rescue: '{source_path}' is both the source and the "
             "destination. Pick a different place for the image."
         )
 
-    if map_file.resolve() == destination_path.resolve():
+    if _resolved(map_file) == _resolved(destination_path):
         raise RescueError(
             "The progress file and the image are the same file: "
             f"'{destination_path}'. Saving the rescue's progress "
@@ -546,7 +565,7 @@ def rescue_to_image(
             "different place for the progress file."
         )
 
-    if source_path is not None and map_file.resolve() == source_path.resolve():
+    if source_path is not None and _resolved(map_file) == _resolved(source_path):
         raise RescueError(
             "The progress file would be written onto the drive being "
             f"rescued: '{source_path}'. A rescue never writes to its "

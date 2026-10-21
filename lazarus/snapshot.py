@@ -125,7 +125,18 @@ def create_snapshot(
     # folder inside it, not one of its own files. Copying the copies
     # into the copies helps no one and buries the real data.
     store_root = store.root
-    resolved = raw.resolve()
+    try:
+        resolved = raw.resolve()
+    except (RuntimeError, OSError):
+        # A shortcut that loops back on itself can never be
+        # followed to a real place, and resolve() raises a raw
+        # RuntimeError for one — not a designed answer.
+        raise SourceNotFoundError(
+            f"'{source}' is a shortcut that points back on "
+            "itself (a loop), so there is no real file or folder "
+            "at the end of it to save. Pick the real file or "
+            "folder instead."
+        ) from None
     if resolved == store_root or store_root in resolved.parents:
         raise StoreError(
             "That is the Lazarus store itself, or something inside it. "

@@ -18,6 +18,7 @@ is what makes a dying drive rehearsable on a healthy machine.
 from __future__ import annotations
 
 import os
+import stat
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -51,6 +52,26 @@ class ReadOnlySource:
             raise SourceError(
                 f"Lazarus could not find {self.path}. "
                 "Check the name and try again."
+            )
+        # Judge what the path IS before opening it. Opening a
+        # pipe to read waits until a writer appears — possibly
+        # forever — and a socket cannot be opened as a file at
+        # all. The window refuses both in its own layer, but the
+        # command line hands paths straight here, so the refusal
+        # lives here too, before the open that would block. The
+        # check follows shortcuts, because the open below would.
+        try:
+            mode = os.stat(self.path).st_mode
+        except OSError:
+            mode = None
+        if mode is not None and (
+            stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode)
+        ):
+            kind = "a pipe" if stat.S_ISFIFO(mode) else "a socket"
+            raise SourceError(
+                f"{self.path} is {kind}, not a drive or a drive "
+                "image. Point Lazarus at the drive or the image "
+                "file itself."
             )
         self.open_flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
         try:

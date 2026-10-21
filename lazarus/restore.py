@@ -94,7 +94,17 @@ def _select_entries(
 
 
 def _check_destination(store: SnapshotStore, destination: Path) -> Path:
-    dest = destination.resolve()
+    try:
+        dest = destination.resolve()
+    except (RuntimeError, OSError):
+        # A shortcut that loops back on itself can never be
+        # followed to a real folder, and resolve() raises a raw
+        # RuntimeError for one — not a designed answer.
+        raise RestoreRefusedError(
+            f"'{destination}' cannot be followed to a real "
+            "folder: it points back on itself (a shortcut that "
+            "loops), or sits inside one. Pick a different folder."
+        ) from None
     root = store.root
     if dest == root or root in dest.parents:
         raise RestoreRefusedError(
