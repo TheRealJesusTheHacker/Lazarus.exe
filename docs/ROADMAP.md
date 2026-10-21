@@ -446,8 +446,10 @@ on real NTFS volumes and a real failing drive.
   (see above) packaged into the Technician's Toolkit USB set,
   alongside Argus Portable and Charon Portable, for technician
   field work.
-- Whole-disk/partition restore (bare-metal recovery) — after the
-  file-level engine has proven itself on hardware.
+- Whole-disk/partition restore (bare-metal recovery) —
+  **SEQUENCED 2026-10-21 (B-9):** affirmed behind the same
+  owner hardware proof of the file-level engine; nothing starts
+  before that proof exists.
 - Additional published-decryptor coverage as researchers release
   new ones.
 
