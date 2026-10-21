@@ -104,7 +104,7 @@ independently of it:
 | FAT12 / FAT16 / FAT32 | Proven | Independent spec-built images: intact, partly reused, and fully reused deletions; long names; subfolders; erased start records |
 | NTFS (MFT-record scan) | Proven | Independent spec-built images: resident and non-resident files, $BITMAP split verdicts, fixup-damaged records skipped and counted |
 | NTFS folder-index / journal recovery | Decided-to-build, sequenced (2026-10-21, B-7) | Builds as Lazarus's next phase AFTER the owner's hardware proof of the file-level engine (the roadmap's own safety order); not started |
-| ext2 / ext4 and others | Pending | Not yet read; such a drive is refused in plain language, never guessed at |
+| ext2 / ext4 and others | Closed (2026-10-21, B-8) | Decided not to build — Sentinel's clients are Windows shops; the plain refusal already shipped is the honest posture |
 
 Verified on Linux against synthetic images and synthetic failing
 drives. The first run against real Windows hardware — a real
