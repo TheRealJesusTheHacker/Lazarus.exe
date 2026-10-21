@@ -2,6 +2,73 @@
 
 All notable changes to LAZARUS.EXE are recorded here, newest first.
 
+## [1.0.3] — 2026-10-21
+
+Fleet sweep #3: a full bug, function, and security hunt over
+the whole tree, with fixes. The Phase 5 audit's recorded
+residuals are closed here — the pipe that could hang the
+command line, and the shortcut loop that crashed the rescue —
+and five more findings from the sweep are fixed alongside.
+
+### Fixed
+
+- **A pipe or socket handed to the engine can no longer hang
+  it forever.** The read-only source opened its path *before*
+  judging what it was, and opening a pipe to read waits for a
+  writer who may never come — so the command line's scan,
+  recover, and rescue could be made to wait forever on a
+  source the window already refused in its own layer. The
+  source now judges the path (following shortcuts, as the
+  open would) and refuses a pipe or a socket in plain words
+  before opening anything.
+- **The window no longer keeps the recovery key reachable
+  after an unlock.** The engine drops the BitLocker key the
+  moment the single attempt ends, but the window's worker kept
+  its callable — and the key that callable closed over — for
+  the window's whole life. A finished worker now drops its
+  callable before reporting, so the key's lifetime is the
+  attempt's lifetime, exactly as the key dialog promises.
+- **A shortcut that loops gets a plain refusal, not a crash.**
+  Rescue, recovery, snapshot, and restore all follow shortcuts
+  with `Path.resolve()`, which raises a raw `RuntimeError` on
+  a loop: the command line died with a traceback and the
+  window could only apologise. Each now refuses in plain
+  words naming the looping path. (This closes the Phase 5
+  audit's third recorded residual.)
+- **Recovery streams instead of loading whole files into
+  memory.** A deleted file is now written a chunk at a time
+  and hashed as it lands; before, recovering a file larger
+  than the machine's memory could take the recovery down with
+  it. The accounting is unchanged — short reads still count
+  as missing and are padded — and a copy that cannot be
+  written whole is no longer left behind under the recovered
+  name, where a truncated file would read as the real one.
+- **A backup run reports its own outcome even when its
+  history line cannot be written.** The run's finish raised
+  over the top of its real result — a completed backup
+  reported as a crash. The failure is now carried in the
+  result, in plain words, alongside the outcome that stands.
+- **The size estimate ignores future-dated runs**, like every
+  other history derivation already did: a run claiming to be
+  from years ahead can no longer set the "last time" guide.
+- **The installer's copy check says what it does.** It
+  compares sizes (the designed check), and its success line
+  no longer says "byte for byte in size" — it says the copy
+  is the same size as the program you ran.
+- **Backup status directions name both doors.** The damaged-
+  store advice told everyone to run a command-line command —
+  including people reading it in the window. It now names the
+  window's 'Verify this store' button and the command line's
+  'lazarus verify' alike, and the same for tidying.
+
+### Notes
+
+- Suite: 588 passed, 2 skipped (offscreen; skip count moves
+  with the test machine's device topology — 586/4 on another
+  layout — with zero failures in every layout). Still
+  unproven on real Windows hardware, exactly as before: the
+  hardware verification list stands unchanged.
+
 ## [1.0.2] — 2026-10-20
 
 The window gets Lazarus's own colours. Nothing about how
