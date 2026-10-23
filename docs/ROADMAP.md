@@ -442,7 +442,8 @@ on real NTFS volumes and a real failing drive.
 
 ## Later / backlog
 
-- Technician's Toolkit USB bundling — the Phase 5 portable edition
+- Technician's Toolkit USB bundling — SHIPPED (2026-10-20, in the
+  Technician's Toolkit bundle v1.0.0): the Phase 5 portable edition
   (see above) packaged into the Technician's Toolkit USB set,
   alongside Argus Portable and Charon Portable, for technician
   field work.
