@@ -39,12 +39,32 @@ def _copy_object(store: SnapshotStore, source_file: Path) -> tuple[str, int]:
     """Copy one file's contents into the object area, by hash.
 
     Returns ``(sha256, size)``. If those exact contents are already
-    stored *and still check out*, the copy is thrown away — the
+    stored *and still check out*, no copy is made at all — the
     object area keeps one copy of any content, however many snapshots
     point at it. A stored object that no longer matches its name is
     torn or tampered with, and is healed by the fresh copy rather
     than trusted on existence alone.
     """
+    # Hash the source first, before copying anything. When those
+    # exact contents are already stored and still check out, the
+    # copy is not made at all: in a backup run most files have not
+    # changed since the last snapshot, and copying every one of
+    # them into a temporary file only to throw it away was the
+    # run's biggest waste of writes. When a copy IS needed, the
+    # copy pass below re-hashes as it writes and its hash is the
+    # one returned, exactly as before.
+    sha256 = hash_file(source_file)
+    final = store.object_path(sha256)
+    if final.exists():
+        try:
+            intact = hash_file(final) == sha256
+        except OSError:
+            intact = False
+        if intact:
+            # The stored copy's own size is the size of these exact
+            # contents — never a stat of a source that may still be
+            # changing under the hash pass.
+            return sha256, final.stat().st_size
     fanout = store.objects_dir
     tmp = fanout / f".incoming-{secrets.token_hex(6)}"
     try:

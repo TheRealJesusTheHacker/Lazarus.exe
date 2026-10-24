@@ -52,21 +52,43 @@ from .snapshot import create_snapshot
 from .store import SnapshotStore
 
 
-def _blob_problem(store: SnapshotStore, entry: FileEntry) -> Optional[str]:
-    """Plain-language reason this entry's saved copy is unusable, or None."""
-    blob = store.object_path(entry.sha256 or "")
+def _blob_problem(
+    store: SnapshotStore,
+    entry: FileEntry,
+    cache: Optional[dict] = None,
+) -> Optional[str]:
+    """Plain-language reason this entry's saved copy is unusable, or None.
+
+    Entries that name the same stored copy share one verdict when a
+    ``cache`` is handed in: the copy is hashed once per restore, not
+    once per entry pointing at it — identical contents saved under
+    several names are the common case in a real folder.
+    """
+    sha256 = entry.sha256 or ""
+    if cache is not None and sha256 in cache:
+        return cache[sha256]
+    blob = store.object_path(sha256)
     if not blob.exists():
-        return "Its saved copy is missing from the store, so it cannot come back."
-    try:
-        actual = hash_file(blob)
-    except OSError:
-        return "Its saved copy could not be read, so it cannot come back."
-    if actual != entry.sha256:
-        return (
-            "Its saved copy has changed since it was saved and no longer "
-            "matches the snapshot's record, so it was not trusted."
+        problem: Optional[str] = (
+            "Its saved copy is missing from the store, so it cannot come back."
         )
-    return None
+    else:
+        try:
+            actual = hash_file(blob)
+        except OSError:
+            problem = (
+                "Its saved copy could not be read, so it cannot come back."
+            )
+        else:
+            problem = (
+                "Its saved copy has changed since it was saved and no longer "
+                "matches the snapshot's record, so it was not trusted."
+                if actual != entry.sha256
+                else None
+            )
+    if cache is not None:
+        cache[sha256] = problem
+    return problem
 
 
 def _select_entries(
@@ -349,9 +371,10 @@ def restore(
     # Step 2: prove every needed saved copy before writing anything.
     usable: list[FileEntry] = []
     broken: dict[str, str] = {}
+    blob_problems: dict = {}
     for entry in selected:
         if entry.type == TYPE_FILE:
-            problem = _blob_problem(store, entry)
+            problem = _blob_problem(store, entry, blob_problems)
             if problem is None:
                 usable.append(entry)
             else:

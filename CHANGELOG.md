@@ -2,6 +2,38 @@
 
 All notable changes to LAZARUS.EXE are recorded here, newest first.
 
+## [1.0.4] — 2026-10-24
+
+Fleet sweep #5: a bug hunt and performance pass. No bugs that
+change any answer Lazarus gives were found; what the sweep found
+was the same saved bytes being read and copied over and over.
+Three fixes, all behaviour-preserving — every verdict, count,
+and message is exactly as before, proven by the full suite plus
+new tests that pin the work being done once.
+
+### Performance
+
+- **Verifying a store hashes each saved copy once, not once
+  per snapshot that points at it.** A store holds one copy of
+  any content however many snapshots name it, but verify
+  re-hashed that copy for every entry in every snapshot — a
+  store with twelve snapshots of the same folder was read
+  twelve times over. Measured on a 32 MB store with twelve
+  snapshots: 4.31 s → 0.55 s.
+- **A restore's pre-write proof hashes each saved copy once
+  per restore,** however many files in the snapshot share it
+  (identical contents under several names are the common case
+  in a real folder).
+- **Taking a snapshot no longer copies unchanged files into a
+  temporary file only to discard the copy.** The source is
+  hashed first; when the stored copy of those exact contents
+  already exists and still checks out, no copy is made. A torn
+  or tampered stored copy is still healed by a fresh copy, and
+  a copy that is made is still hashed as it is written, exactly
+  as before. Measured on an unchanged 32 MB folder: the repeat
+  snapshot took 1.74 s → 1.05 s (a first snapshot of brand-new
+  content pays one extra read pass: 1.70 s → 2.14 s).
+
 ## [1.0.3] — 2026-10-21
 
 Fleet sweep #3: a full bug, function, and security hunt over

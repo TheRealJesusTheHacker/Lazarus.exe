@@ -2,7 +2,7 @@
 
 **Sentinel Safeguard LLC — backup, restore, and file recovery for Windows.**
 
-[![Version](https://img.shields.io/badge/version-v1.0.3-f0a13c?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
+[![Version](https://img.shields.io/badge/version-v1.0.4-f0a13c?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/TheRealJesusTheHacker/Lazarus.exe)
 [![Python](https://img.shields.io/badge/Python-3-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Proprietary-b03a2e?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/LICENSE)
@@ -119,6 +119,15 @@ MISSING, TARGET FULL, STORE DAMAGED, NEVER RUN, OVERDUE, or
 UNFINISHED, with the numbers and what to do — then setup, run
 now, history, and the tidying rule with its preview. The
 command line remains, unchanged.
+
+**v1.0.4** is fleet sweep #5's patch: verifying a store,
+checking a restore, and taking a snapshot no longer re-read the
+same saved bytes over and over — each stored copy is hashed once
+per run, however many snapshots or files point at it, and a
+snapshot of unchanged files no longer copies them into a
+temporary file only to throw the copy away. Every verdict,
+count, and message is unchanged; the work is simply done once.
+See [CHANGELOG.md](CHANGELOG.md).
 
 **v1.0.3** is fleet sweep #3's patch: the engine refuses a
 pipe or a socket before any open can hang on it, the window

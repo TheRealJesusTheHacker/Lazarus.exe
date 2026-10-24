@@ -10,7 +10,7 @@ does not get to call itself verified.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Optional, Union
 
 from .hashing import hash_file, is_valid_hash
 from .model import TYPE_FILE, Problem, SnapshotManifest, is_safe_relative_path
@@ -41,11 +41,50 @@ class VerifyResult:
         )
 
 
+def _blob_outcome(
+    store: SnapshotStore, sha256: str, cache: Optional[dict] = None
+) -> str:
+    """How one stored copy stands: ok | missing | unreadable | changed.
+
+    The verdict is worked out by hashing the copy once. When a
+    ``cache`` dict is handed in, the verdict is kept in it under the
+    copy's hash and reused for every later entry — in this snapshot
+    or a later one — that points at the same copy: a store holds one
+    copy of any content however many snapshots name it, and hashing
+    those same bytes again for every entry proves nothing new. The
+    messages each caller reports stay exactly the per-entry ones;
+    only the repeated hashing goes away.
+    """
+    if cache is not None and sha256 in cache:
+        return cache[sha256]
+    blob = store.object_path(sha256)
+    if not blob.exists():
+        outcome = "missing"
+    else:
+        try:
+            actual = hash_file(blob)
+        except OSError:
+            outcome = "unreadable"
+        else:
+            outcome = "ok" if actual == sha256 else "changed"
+    if cache is not None:
+        cache[sha256] = outcome
+    return outcome
+
+
 def verify_snapshot(
     store: SnapshotStore,
     snapshot: Union[str, SnapshotManifest],
+    _blob_cache: Optional[dict] = None,
 ) -> VerifyResult:
-    """Re-hash every file a snapshot promises and compare."""
+    """Re-hash every file a snapshot promises and compare.
+
+    ``_blob_cache`` is shared by :func:`verify_store` across all the
+    snapshots it checks (see :func:`_blob_outcome`); a lone call
+    leaves it out and gets a cache of its own for the one snapshot.
+    """
+    if _blob_cache is None:
+        _blob_cache = {}
     manifest = (
         snapshot if isinstance(snapshot, SnapshotManifest) else store.load_manifest(snapshot)
     )
@@ -80,8 +119,8 @@ def verify_snapshot(
                 )
             )
             continue
-        blob = store.object_path(entry.sha256)
-        if not blob.exists():
+        outcome = _blob_outcome(store, entry.sha256, _blob_cache)
+        if outcome == "missing":
             result.problems.append(
                 Problem(
                     path=entry.path,
@@ -89,9 +128,7 @@ def verify_snapshot(
                 )
             )
             continue
-        try:
-            actual = hash_file(blob)
-        except OSError:
+        if outcome == "unreadable":
             result.problems.append(
                 Problem(
                     path=entry.path,
@@ -99,7 +136,7 @@ def verify_snapshot(
                 )
             )
             continue
-        if actual != entry.sha256:
+        if outcome == "changed":
             result.problems.append(
                 Problem(
                     path=entry.path,
@@ -139,6 +176,9 @@ def verify_store(store: SnapshotStore) -> StoreVerifyResult:
             )
         )
         return result
+    # One cache for the whole store: the same stored copy is hashed
+    # once, however many snapshots point at it.
+    blob_cache: dict = {}
     for info in store.list_snapshots():
         if not info.has_manifest:
             result.problems.append(
@@ -148,7 +188,7 @@ def verify_store(store: SnapshotStore) -> StoreVerifyResult:
                 )
             )
             continue
-        checked = verify_snapshot(store, info.id)
+        checked = verify_snapshot(store, info.id, _blob_cache=blob_cache)
         result.snapshots_checked += 1
         for problem in checked.problems:
             result.problems.append(
