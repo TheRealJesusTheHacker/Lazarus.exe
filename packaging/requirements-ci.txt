@@ -23,5 +23,11 @@ pefile==2024.8.26
 altgraph==0.17.5
 pywin32-ctypes==0.2.3
 packaging==25.0
-setuptools==83.0.0
+# 2026-10-24 (Fleet Sweep #5 close-out): setuptools is pinned at
+# 84.1.0, not 83.0.0 — 83.0.0 carries GHSA-xmj3-9gf7-h52w (a Windows
+# path escape via namespace_packages.txt during legacy wheel
+# installation, fixed in 84.1.0). Build-time only, the same rule as
+# Sweep #4: a pinned build tool with a known vulnerability does not
+# stay pinned.
+setuptools==84.1.0
 pytest==9.1.1
