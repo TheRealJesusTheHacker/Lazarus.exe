@@ -38,7 +38,7 @@
 # dependencies, so a `pip install .` under build isolation would
 # fetch that floor unverified by hash. Mitigation in force: the
 # release workflow never pip-builds the project -- it installs
-# THIS lock first (which provides setuptools==84.1.0, hashed) and
+# THIS lock first (which provides setuptools==84.2.1, hashed) and
 # builds with PyInstaller (tools/build_release.py) against that
 # environment. Anyone building the project package itself must
 # likewise install this lock first and build with
@@ -164,7 +164,7 @@ pywin32-ctypes==0.2.3 \
     --hash=sha256:d162dc04946d704503b2edc4d55f3dba5c1d539ead017afa00142c38b9885755
     # via -r packaging/requirements-ci.txt
 
-setuptools==84.1.0 \
+setuptools==84.2.1 \
     --hash=sha256:23657205b63d4d31395ab917815247f694aafad28cd21316bf5fd45a51048ea0 \
     --hash=sha256:5231689c6ac8156cd155cfb98c3fd6fb252c3e7e9bd3d78b64d3c55f132624c9
     # via
