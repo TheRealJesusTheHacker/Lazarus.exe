@@ -2,7 +2,7 @@
 
 **Sentinel Safeguard LLC — backup, restore, and file recovery for Windows.**
 
-[![Version](https://img.shields.io/badge/version-v1.0.4-f0a13c?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
+[![Version](https://img.shields.io/badge/version-v1.0.5-f0a13c?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/lazarus/__init__.py)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/TheRealJesusTheHacker/Lazarus.exe)
 [![Python](https://img.shields.io/badge/Python-3-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Proprietary-b03a2e?style=flat-square)](https://github.com/TheRealJesusTheHacker/Lazarus.exe/blob/main/LICENSE)
@@ -119,6 +119,17 @@ MISSING, TARGET FULL, STORE DAMAGED, NEVER RUN, OVERDUE, or
 UNFINISHED, with the numbers and what to do — then setup, run
 now, history, and the tidying rule with its preview. The
 command line remains, unchanged.
+
+**v1.0.5** is a supply-chain patch: the release workflow
+now installs its dependencies from a committed SHA-256 lock
+with `--require-hashes`, so every package the release is
+built with is verified before it is used, and the CI
+setuptools pin is 84.1.0 (the GHSA-xmj3-9gf7-h52w fix). A
+functional bug hunt over the core workflows — snapshot,
+verify (including a tampered store), restore, and the
+backup cycle, all exercised end to end — found no defects;
+the suite stands at 594 passed, 2 skipped. No behaviour
+change from 1.0.4.
 
 **v1.0.4** is fleet sweep #5's patch: verifying a store,
 checking a restore, and taking a snapshot no longer re-read the

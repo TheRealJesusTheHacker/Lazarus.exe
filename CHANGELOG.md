@@ -2,6 +2,33 @@
 
 All notable changes to LAZARUS.EXE are recorded here, newest first.
 
+## [1.0.5] — 2026-10-25
+
+Supply-chain patch release. No behaviour change: every
+verdict, count, and message is exactly as in 1.0.4.
+
+- **Release builds now install from a hash-locked dependency
+  set.** The release workflow installs
+  `packaging/requirements-ci.lock.txt` with
+  `pip install --require-hashes`: every package — direct pins
+  and the full transitive tree — is verified against a
+  committed SHA-256 lock, and the install fails loudly on any
+  mismatch.
+- **CI setuptools pin updated to 84.1.0**, which fixes
+  GHSA-xmj3-9gf7-h52w (a Windows path escape in older
+  setuptools); the pin landed with Fleet Sweep #5's
+  close-out.
+- **Functional bug hunt (this release train): no defects
+  found.** The full suite passes (594 passed, 2 skipped).
+  The core workflows were exercised end to end on a fixture
+  folder: store init, snapshot, list, verify (a tampered
+  stored copy is caught and named; the clean store verifies
+  byte for byte), restore of the latest snapshot and of a
+  chosen older snapshot (restored bytes identical to the
+  source), and a backup setup → run → status → history
+  cycle. The window was built offscreen: all five pages
+  present, their controls wired.
+
 ## [1.0.4] — 2026-10-24
 
 Fleet sweep #5: a bug hunt and performance pass. No bugs that
