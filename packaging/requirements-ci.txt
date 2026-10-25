@@ -1,5 +1,14 @@
 # CI dependency pins for the Windows release build.
 #
+# HASH LOCK (2026-10-25, --require-hashes fleet rollout): installs
+# use the committed lock beside this file --
+#   pip install --require-hashes -r packaging/requirements-ci.lock.txt
+# The lock carries the full resolved set (direct + transitive)
+# with a sha256 for every artifact, and pip fails loudly on any
+# mismatch. This file remains the human-edited pin list; a pin
+# bump here is not landed until the lock is regenerated (the
+# procedure is in the lock's header).
+#
 # EXACT versions on purpose: the release pipeline must build with
 # the same libraries every time, never with whatever happens to be
 # newest on release day. These are the same pins the Argus, Charon,

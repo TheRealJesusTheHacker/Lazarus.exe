@@ -29,7 +29,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install what the build needs
-        run: pip install -r packaging/requirements-ci.txt
+        # Hash-locked (owner policy 2026-10-25): every package is
+        # verified against packaging/requirements-ci.lock.txt and
+        # the install fails loudly on any mismatch. The lock is
+        # the full resolved set for the pins in
+        # packaging/requirements-ci.txt -- bump pins there only
+        # together with a regenerated lock (see the lock header).
+        run: pip install --require-hashes -r packaging/requirements-ci.lock.txt
 
       - name: Run the full test suite (interface offscreen)
         timeout-minutes: 45
